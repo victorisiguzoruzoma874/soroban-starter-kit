@@ -60,6 +60,12 @@ jobs:
           terraform -chdir=${{ env.TF_WORKING_DIR }} init -backend=false
           terraform -chdir=${{ env.TF_WORKING_DIR }} validate
 
+      - name: tfsec security scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ${{ env.TF_WORKING_DIR }}
+          soft_fail: false
+
   # ── Plan (PRs, pushes, and manual plan trigger) ────────────────────────────
   plan:
     name: Plan (${{ github.event.inputs.environment || 'staging' }})
