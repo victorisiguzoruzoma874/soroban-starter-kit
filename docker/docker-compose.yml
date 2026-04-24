@@ -8,7 +8,7 @@ services:
       - "3000:3000"
     volumes:
       - ..:/app
-      - /app/node_modules          # keep container node_modules isolated
+      - /app/node_modules # keep container node_modules isolated
     env_file: ../.env
     depends_on:
       - stellar-node
@@ -40,10 +40,13 @@ services:
     environment:
       - ENABLE_SOROBAN_RPC=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/" ]
       interval: 10s
       timeout: 5s
       retries: 10
+
+# To clean the cargo-cache volume (which can grow to several GB), run:
+# docker volume rm soroban-starter-kit_cargo-cache
 
 volumes:
   cargo-cache:

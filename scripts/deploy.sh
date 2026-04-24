@@ -40,12 +40,14 @@ deploy_contract() {
   [[ -n "$WASM" ]] || { echo "No WASM found for $name"; return 1; }
 
   echo "── Deploying $name to $NETWORK ──"
-  stellar contract deploy \
+  CONTRACT_ID=$(stellar contract deploy \
     --wasm "$WASM" \
     --rpc-url "$RPC_URL" \
     --network-passphrase "$PASSPHRASE" \
     --source-account default \
-    --network "$NETWORK"
+    --network "$NETWORK")
+  echo "$name: $CONTRACT_ID" >> "$ROOT/.contract-ids"
+  echo "Contract ID: $CONTRACT_ID"
 }
 
 if [[ "$CONTRACT" == "all" ]]; then
