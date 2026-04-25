@@ -60,6 +60,12 @@ jobs:
           terraform -chdir=${{ env.TF_WORKING_DIR }} init -backend=false
           terraform -chdir=${{ env.TF_WORKING_DIR }} validate
 
+      - name: tfsec security scan
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ${{ env.TF_WORKING_DIR }}
+          soft_fail: false
+
   # ── Plan (PRs, pushes, and manual plan trigger) ────────────────────────────
   plan:
     name: Plan (${{ github.event.inputs.environment || 'staging' }})
@@ -85,29 +91,6 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
-
-      - name: Cache .terraform
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TF_WORKING_DIR }}/.terraform
-          key: terraform-${{ runner.os }}-${{ hashFiles(format('{0}/.terraform.lock.hcl', env.TF_WORKING_DIR)) }}
-          restore-keys: terraform-${{ runner.os }}-
-
-      - name: terraform init
-        run: terraform -chdir=infra/terraform/envs/${{ env.ENV }} init -input=false -backend=false
-
-      - name: terraform plan
-        run: |
-          terraform -chdir=infra/terraform/envs/${{ env.ENV }} plan \
-            -var="cloud=${{ env.CLOUD }}" \
-            -input=false \
-            -no-color \
-            -out=tfplan
-        continue-on-error: true
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            us-east-1
-        continue-on-error: true
 
       - name: Cache .terraform
         uses: actions/cache@v4
@@ -173,15 +156,6 @@ jobs:
           key: terraform-${{ runner.os }}-${{ hashFiles(format('{0}/.terraform.lock.hcl', env.TF_WORKING_DIR)) }}
           restore-keys: terraform-${{ runner.os }}-
 
-      - name: Download plan artifact
-        uses: actions/download-artifact@v4
-      - name: Restore .terraform cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.TF_WORKING_DIR }}/.terraform
-          key: terraform-${{ runner.os }}-${{ hashFiles(format('{0}/.terraform.lock.hcl', env.TF_WORKING_DIR)) }}
-          restore-keys: terraform-${{ runner.os }}-
-
       - name: terraform init
         run: |
           terraform -chdir=${{ env.TF_WORKING_DIR }} init \
@@ -201,7 +175,6 @@ jobs:
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} apply -input=false tfplan
 
       - name: Print outputs
-        run: terraform -chdir=infra/terraform/envs/${{ env.ENV }} output -json
         run: terraform -chdir=${{ env.TF_WORKING_DIR }} output -json
 
   # ── Destroy (manual trigger only) ─────────────────────────────────────────
@@ -222,13 +195,12 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (OIDC)
         if: env.CLOUD == 'aws'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:            us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
 
       - name: terraform init
         run: |
