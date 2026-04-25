@@ -24,6 +24,9 @@ CONTRACT_ID=$(stellar contract deploy \
 echo "✅ Escrow contract deployed!"
 echo "📋 Contract ID: $CONTRACT_ID"
 
+# Save contract ID
+echo "escrow: $CONTRACT_ID" >> ../../../.contract-ids
+
 # Example initialization (uncomment to use)
 # echo "🔧 Initializing escrow..."
 # BUYER_ADDRESS="GDXY2OEZQHIFKHDN7SWZQYN3JGMVGXD3UYEQMY4FIBWMHQPD5NEKZFIN"

@@ -26,12 +26,31 @@ fn test_initialize() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let client = init_token(&env, &admin);
+    let (client, contract_address) = create_token_contract(&env);
+    let name = String::from_str(&env, "Test Token");
+    let symbol = String::from_str(&env, "TEST");
+    let decimals = 18u32;
+    client.initialize(&admin, &name, &symbol, &decimals, &None);
+
     assert_eq!(client.admin(), admin);
-    assert_eq!(client.name(), String::from_str(&env, "Test Token"));
-    assert_eq!(client.symbol(), String::from_str(&env, "TEST"));
-    assert_eq!(client.decimals(), 18u32);
+    assert_eq!(client.name(), name.clone());
+    assert_eq!(client.symbol(), symbol.clone());
+    assert_eq!(client.decimals(), decimals);
     assert_eq!(client.total_supply(), 0i128);
+
+    // Verify initialized event was emitted
+    use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+    assert_eq!(
+        env.events().all(),
+        soroban_sdk::vec![
+            &env,
+            (
+                contract_address.clone(),
+                (Symbol::new(&env, "initialized"), admin.clone()).into_val(&env),
+                (name, symbol, decimals).into_val(&env),
+            ),
+        ]
+    );
 }
 
 #[test]
@@ -178,6 +197,40 @@ fn test_mint_zero_amount() {
 }
 
 #[test]
+fn test_set_admin() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let (client, contract_address) = create_token_contract(&env);
+    client.initialize(
+        &admin,
+        &String::from_str(&env, "Test Token"),
+        &String::from_str(&env, "TEST"),
+        &18u32,
+        &None,
+    );
+
+    client.set_admin(&new_admin);
+
+    // Admin must be updated in storage
+    assert_eq!(client.admin(), new_admin);
+
+    // Verify admin_changed event was emitted with old_admin as topic and new_admin as data
+    use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+    let all_events = env.events().all();
+    let last = all_events.last().unwrap();
+    assert_eq!(
+        last,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "admin_changed"), admin.clone()).into_val(&env),
+            new_admin.clone().into_val(&env),
+        )
+    );
+}
+
+#[test]
 #[should_panic]
 fn test_unauthorized_set_admin_fails() {
     let env = Env::default();
@@ -198,4 +251,44 @@ fn test_unauthorized_set_admin_fails() {
     // attacker tries to set admin without authorization — should panic
     client.set_admin(&new_admin);
     let _ = attacker;
+}
+
+#[test]
+fn test_approve_revoke() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let (client, contract_address) = create_token_contract(&env);
+    client.initialize(
+        &admin,
+        &String::from_str(&env, "Test Token"),
+        &String::from_str(&env, "TEST"),
+        &18u32,
+        &None,
+    );
+    client.mint(&user, &1000i128);
+
+    // Set a normal allowance first
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&user, &spender, &500i128, &expiration);
+    assert_eq!(client.allowance(&user, &spender), 500i128);
+
+    // Revoke by approving with amount == 0 — must emit revoke, not approve
+    use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+    client.approve(&user, &spender, &0i128, &expiration);
+    assert_eq!(client.allowance(&user, &spender), 0i128);
+
+    // The last event must be revoke, not approve
+    let all_events = env.events().all();
+    let last = all_events.last().unwrap();
+    assert_eq!(
+        last,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "revoke"), user.clone(), spender.clone()).into_val(&env),
+            ().into_val(&env),
+        )
+    );
 }

@@ -131,11 +131,11 @@ impl TokenContract {
 
     /// Transfer admin role to `new_admin`. Current admin only.
     pub fn set_admin(env: Env, new_admin: Address) -> Result<(), TokenError> {
-        let admin = require_admin(&env)?;
-        admin.require_auth();
+        let old_admin = require_admin(&env)?;
+        old_admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &new_admin);
         bump_instance(&env);
-        events::admin_set(&env, &new_admin);
+        events::admin_changed(&env, &old_admin, &new_admin);
         Ok(())
     }
 
@@ -190,7 +190,13 @@ impl token::TokenInterface for TokenContract {
                 .temporary()
                 .extend_ttl(&key, expiration_ledger, expiration_ledger);
         }
-        events::approved(&env, &from, &spender, amount);
+        // Emit a distinct revoke event when amount == 0 (allowance revocation),
+        // so off-chain systems can distinguish revocations from normal approvals.
+        if amount == 0 {
+            events::revoked(&env, &from, &spender);
+        } else {
+            events::approved(&env, &from, &spender, amount);
+        }
     }
 
     fn balance(env: Env, id: Address) -> i128 {
