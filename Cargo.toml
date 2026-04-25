@@ -1,13 +1,9 @@
 [workspace]
-members = [
-    "contracts/common",
-    "contracts/token",
-    "contracts/escrow",
-]
+members = ["contracts/common", "contracts/token", "contracts/escrow"]
 resolver = "2"
 
 [workspace.dependencies]
-soroban-sdk = "21"
+soroban-sdk = "=21.7.7"
 soroban-common = { path = "contracts/common" }
 
 [workspace.package]

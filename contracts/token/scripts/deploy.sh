@@ -24,6 +24,9 @@ CONTRACT_ID=$(stellar contract deploy \
 echo "✅ Token contract deployed!"
 echo "📋 Contract ID: $CONTRACT_ID"
 
+# Save contract ID
+echo "token: $CONTRACT_ID" >> ../../../.contract-ids
+
 # Initialize the contract (example)
 echo "🔧 Initializing contract..."
 ADMIN_ADDRESS="GDXY2OEZQHIFKHDN7SWZQYN3JGMVGXD3UYEQMY4FIBWMHQPD5NEKZFIN"
