@@ -218,3 +218,43 @@ fn test_unauthorized_set_admin_fails() {
     client.set_admin(&new_admin);
     let _ = attacker;
 }
+
+#[test]
+fn test_approve_revoke() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let (client, contract_address) = create_token_contract(&env);
+    client.initialize(
+        &admin,
+        &String::from_str(&env, "Test Token"),
+        &String::from_str(&env, "TEST"),
+        &18u32,
+        &None,
+    );
+    client.mint(&user, &1000i128);
+
+    // Set a normal allowance first
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&user, &spender, &500i128, &expiration);
+    assert_eq!(client.allowance(&user, &spender), 500i128);
+
+    // Revoke by approving with amount == 0 — must emit revoke, not approve
+    use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+    client.approve(&user, &spender, &0i128, &expiration);
+    assert_eq!(client.allowance(&user, &spender), 0i128);
+
+    // The last event must be revoke, not approve
+    let all_events = env.events().all();
+    let last = all_events.last().unwrap();
+    assert_eq!(
+        last,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "revoke"), user.clone(), spender.clone()).into_val(&env),
+            ().into_val(&env),
+        )
+    );
+}

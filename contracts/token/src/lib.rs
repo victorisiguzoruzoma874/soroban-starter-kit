@@ -190,7 +190,13 @@ impl token::TokenInterface for TokenContract {
                 .temporary()
                 .extend_ttl(&key, expiration_ledger, expiration_ledger);
         }
-        events::approved(&env, &from, &spender, amount);
+        // Emit a distinct revoke event when amount == 0 (allowance revocation),
+        // so off-chain systems can distinguish revocations from normal approvals.
+        if amount == 0 {
+            events::revoked(&env, &from, &spender);
+        } else {
+            events::approved(&env, &from, &spender, amount);
+        }
     }
 
     fn balance(env: Env, id: Address) -> i128 {

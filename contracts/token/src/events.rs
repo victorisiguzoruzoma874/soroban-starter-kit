@@ -20,6 +20,10 @@ pub fn approved(env: &Env, from: &Address, spender: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "approve"), from.clone(), spender.clone()), amount);
 }
 
+pub fn revoked(env: &Env, from: &Address, spender: &Address) {
+    env.events().publish((Symbol::new(env, "revoke"), from.clone(), spender.clone()), ());
+}
+
 pub fn transferred(env: &Env, from: &Address, to: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "transfer"), from.clone(), to.clone()), amount);
 }
