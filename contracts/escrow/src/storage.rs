@@ -3,36 +3,30 @@ use soroban_sdk::{contracttype, Address};
 /// Top-level storage keys used by [`EscrowContract`](crate::EscrowContract).
 ///
 /// All keys are stored in instance storage so they share a single TTL bump.
-///
-/// # Examples
-///
-/// ```ignore
-/// env.storage().instance().set(&DataKey::State, &EscrowState::Created);
-/// ```
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
-    /// Instance storage – the buyer's [`Address`].
+    /// The buyer's [`Address`].
     Buyer,
-    /// Instance storage – the seller's [`Address`].
+    /// The seller's [`Address`].
     Seller,
-    /// Instance storage – the arbiter's [`Address`] (used for dispute resolution).
+    /// The arbiter's [`Address`] (used for dispute resolution).
     Arbiter,
-    /// Instance storage – the Soroban token contract [`Address`] used for fund transfers.
+    /// The Soroban token contract [`Address`] used for fund transfers.
     TokenContract,
-    /// Instance storage – escrowed token amount as `i128`.
+    /// Escrowed token amount as `i128`.
     Amount,
-    /// Instance storage – ledger sequence number after which a refund may be requested (`u32`).
+    /// Ledger sequence number after which a refund may be requested (`u32`).
     Deadline,
-    /// Instance storage – current [`EscrowState`] of the escrow lifecycle.
+    /// Current [`EscrowState`] of the escrow lifecycle.
     State,
-    /// Instance storage – `true` once the buyer has approved delivery (`bool`).
+    /// `true` once the buyer has approved delivery (`bool`).
     BuyerApproved,
-    /// Instance storage – `true` once the seller has marked goods/services as delivered (`bool`).
+    /// `true` once the seller has marked goods/services as delivered (`bool`).
     SellerDelivered,
-    /// Instance storage – whether the contract is paused (`bool`).
+    /// Whether the contract is paused (`bool`).
     Paused,
-    /// Instance storage – contract version number (`u32`).
+    /// Contract version number (`u32`).
     Version,
 }
 
@@ -41,13 +35,6 @@ pub enum DataKey {
 /// Transitions follow a strict order:
 /// `Created → Funded → Delivered → Completed`
 /// with side exits to `Refunded` or `Cancelled`.
-///
-/// # Examples
-///
-/// ```ignore
-/// let state: EscrowState = env.storage().instance().get(&DataKey::State).unwrap();
-/// assert_eq!(state, EscrowState::Funded);
-/// ```
 #[contracttype]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum EscrowState {
@@ -57,28 +44,18 @@ pub enum EscrowState {
     Funded = 1,
     /// Seller has marked the obligation as delivered.
     Delivered = 2,
-    /// Funds have been released to the seller.
+    /// Escrow is under arbiter review.
     Disputed = 3,
+    /// Funds have been released to the seller.
     Completed = 4,
-    Refunded = 5,
-    Cancelled = 6,
-    Completed = 3,
     /// Funds have been returned to the buyer.
-    Refunded = 4,
+    Refunded = 5,
     /// Escrow was cancelled before funding.
-    Cancelled = 5,
-    Disputed = 5,
+    Cancelled = 6,
 }
 
 /// Snapshot of all escrow fields returned by
 /// [`EscrowContract::get_escrow_info`](crate::EscrowContract::get_escrow_info).
-///
-/// # Examples
-///
-/// ```ignore
-/// let info: EscrowInfo = escrow_client.get_escrow_info();
-/// assert_eq!(info.state, EscrowState::Funded);
-/// ```
 #[contracttype]
 #[derive(Clone)]
 pub struct EscrowInfo {
