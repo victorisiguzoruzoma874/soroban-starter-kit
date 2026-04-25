@@ -100,6 +100,17 @@ impl EscrowContract {
             amount,
         );
 
+        // Emit initialized event for off-chain indexers
+        env.events().publish(
+            (
+                Symbol::new(&env, "initialized"),
+                buyer.clone(),
+                seller.clone(),
+                arbiter.clone(),
+            ),
+            amount,
+        );
+
         Ok(())
     }
 

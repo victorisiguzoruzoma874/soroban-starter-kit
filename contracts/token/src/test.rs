@@ -26,12 +26,31 @@ fn test_initialize() {
     let env = Env::default();
     env.mock_all_auths();
     let admin = Address::generate(&env);
-    let client = init_token(&env, &admin);
+    let (client, contract_address) = create_token_contract(&env);
+    let name = String::from_str(&env, "Test Token");
+    let symbol = String::from_str(&env, "TEST");
+    let decimals = 18u32;
+    client.initialize(&admin, &name, &symbol, &decimals, &None);
+
     assert_eq!(client.admin(), admin);
-    assert_eq!(client.name(), String::from_str(&env, "Test Token"));
-    assert_eq!(client.symbol(), String::from_str(&env, "TEST"));
-    assert_eq!(client.decimals(), 18u32);
+    assert_eq!(client.name(), name.clone());
+    assert_eq!(client.symbol(), symbol.clone());
+    assert_eq!(client.decimals(), decimals);
     assert_eq!(client.total_supply(), 0i128);
+
+    // Verify initialized event was emitted
+    use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+    assert_eq!(
+        env.events().all(),
+        soroban_sdk::vec![
+            &env,
+            (
+                contract_address.clone(),
+                (Symbol::new(&env, "initialized"), admin.clone()).into_val(&env),
+                (name, symbol, decimals).into_val(&env),
+            ),
+        ]
+    );
 }
 
 #[test]

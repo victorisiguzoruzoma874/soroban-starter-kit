@@ -1,7 +1,7 @@
 use soroban_sdk::{Address, Env, String, Symbol};
 
 pub fn initialized(env: &Env, admin: &Address, name: String, symbol: String, decimals: u32) {
-    env.events().publish((Symbol::new(env, "initialize"), admin.clone()), (name, symbol, decimals));
+    env.events().publish((Symbol::new(env, "initialized"), admin.clone()), (name, symbol, decimals));
 }
 
 pub fn minted(env: &Env, to: &Address, amount: i128) {

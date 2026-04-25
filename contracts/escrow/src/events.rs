@@ -1,5 +1,12 @@
 use soroban_sdk::{Address, Env, Symbol};
 
+pub fn initialized(env: &Env, buyer: &Address, seller: &Address, arbiter: &Address, amount: i128) {
+    env.events().publish(
+        (Symbol::new(env, "initialized"), buyer.clone(), seller.clone(), arbiter.clone()),
+        amount,
+    );
+}
+
 pub fn escrow_created(env: &Env, buyer: &Address, seller: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "escrow_created"), buyer.clone(), seller.clone()), amount);
 }

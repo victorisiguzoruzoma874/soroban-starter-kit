@@ -132,6 +132,11 @@ fn test_initialize() {
                 (Symbol::new(&env, "escrow_created"), buyer.clone(), seller.clone()).into_val(&env),
                 amount.into_val(&env),
             ),
+            (
+                contract_address.clone(),
+                (Symbol::new(&env, "initialized"), buyer.clone(), seller.clone(), arbiter.clone()).into_val(&env),
+                amount.into_val(&env),
+            ),
         ]
     );
 }
@@ -214,6 +219,11 @@ fn test_fund() {
             (
                 contract_address.clone(),
                 (Symbol::new(&env, "escrow_created"), buyer.clone(), seller.clone()).into_val(&env),
+                amount.into_val(&env),
+            ),
+            (
+                contract_address.clone(),
+                (Symbol::new(&env, "initialized"), buyer.clone(), seller.clone(), arbiter.clone()).into_val(&env),
                 amount.into_val(&env),
             ),
             (
