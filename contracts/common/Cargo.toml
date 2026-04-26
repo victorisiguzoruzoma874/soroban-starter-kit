@@ -11,3 +11,8 @@ soroban-sdk = { workspace = true }
 
 [lints]
 workspace = true
+
+# Uncomment to use a local or forked version of soroban-sdk for development
+# [patch.crates-io]
+# soroban-sdk = { path = "/path/to/local/soroban-sdk" }
+# soroban-sdk = { git = "https://github.com/your-fork/soroban-sdk", branch = "your-branch" }
