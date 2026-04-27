@@ -24,7 +24,8 @@
                 },
                 {
                   "u32": 18
-                }
+                },
+                "void"
               ]
             }
           },
@@ -243,7 +244,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ],
       [
@@ -264,7 +265,7 @@
             },
             "ext": "v0"
           },
-          4095
+          518400
         ]
       ]
     ]
@@ -301,7 +302,8 @@
                 },
                 {
                   "u32": 18
-                }
+                },
+                "void"
               ]
             }
           }
@@ -318,7 +320,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "initialize"
+                "symbol": "initialized"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
@@ -398,7 +400,10 @@
           "v0": {
             "topics": [
               {
-                "symbol": "set_admin"
+                "symbol": "admin_changed"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
               }
             ],
             "data": {

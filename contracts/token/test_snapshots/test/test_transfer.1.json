@@ -485,7 +485,7 @@
           "v0": {
             "topics": [
               {
-                "symbol": "initialize"
+                "symbol": "initialized"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"

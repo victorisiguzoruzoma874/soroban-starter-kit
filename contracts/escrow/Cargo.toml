@@ -6,6 +6,10 @@ authors.workspace = true
 description = "A production-ready Soroban escrow contract template"
 license.workspace = true
 
+[features]
+pausable = []
+upgradeable = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

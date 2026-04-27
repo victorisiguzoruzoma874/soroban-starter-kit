@@ -32,12 +32,27 @@ fn bump_persistent(env: &Env, key: &DataKey) {
         .extend_ttl(key, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 }
 
+#[cfg(feature = "pausable")]
+fn require_not_paused(env: &Env) -> Result<(), TokenError> {
+    if env
+        .storage()
+        .instance()
+        .get(&DataKey::Paused)
+        .unwrap_or(false)
+    {
+        return Err(TokenError::Unauthorized);
+    }
+    Ok(())
+}
+
 #[contract]
 pub struct TokenContract;
 
 #[contractimpl]
 impl TokenContract {
     /// Initialize the token with metadata and an admin. Must be called once.
+    ///
+    /// `max_supply` is only enforced when the `capped-supply` feature is enabled.
     pub fn initialize(
         env: Env,
         admin: Address,
@@ -61,7 +76,15 @@ impl TokenContract {
             .instance()
             .set(&DataKey::Metadata(MetadataKey::Decimals), &decimals);
         env.storage().instance().set(&DataKey::TotalSupply, &0i128);
-        let _ = max_supply; // reserved for future max-supply enforcement
+        #[cfg(feature = "capped-supply")]
+        if let Some(cap) = max_supply {
+            if cap <= 0 {
+                return Err(TokenError::InvalidAmount);
+            }
+            env.storage().instance().set(&DataKey::MaxSupply, &cap);
+        }
+        #[cfg(not(feature = "capped-supply"))]
+        let _ = max_supply;
         bump_instance(&env);
         events::initialized(&env, &admin, name, symbol, decimals);
         Ok(())
@@ -69,10 +92,29 @@ impl TokenContract {
 
     /// Mint `amount` tokens to `to`. Admin only.
     pub fn mint(env: Env, to: Address, amount: i128) -> Result<(), TokenError> {
+        #[cfg(feature = "pausable")]
+        require_not_paused(&env)?;
         let admin = require_admin(&env)?;
         admin.require_auth();
         if amount <= 0 {
             return Err(TokenError::InvalidAmount);
+        }
+        #[cfg(feature = "capped-supply")]
+        {
+            let supply: i128 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalSupply)
+                .unwrap_or(0);
+            if let Some(cap) = env
+                .storage()
+                .instance()
+                .get::<DataKey, i128>(&DataKey::MaxSupply)
+            {
+                if supply.checked_add(amount).ok_or(TokenError::Overflow)? > cap {
+                    return Err(TokenError::InvalidAmount);
+                }
+            }
         }
         let balance: i128 = env
             .storage()
@@ -99,6 +141,8 @@ impl TokenContract {
 
     /// Burn `amount` tokens from `from`. Admin only.
     pub fn admin_burn(env: Env, from: Address, amount: i128) -> Result<(), TokenError> {
+        #[cfg(feature = "pausable")]
+        require_not_paused(&env)?;
         let admin = require_admin(&env)?;
         admin.require_auth();
         if amount <= 0 {
@@ -156,6 +200,52 @@ impl TokenContract {
     }
 }
 
+/// Pause / unpause — only compiled when the `pausable` feature is enabled.
+#[cfg(feature = "pausable")]
+#[contractimpl]
+impl TokenContract {
+    /// Pause all token operations. Admin only.
+    pub fn pause(env: Env) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &true);
+        bump_instance(&env);
+        Ok(())
+    }
+
+    /// Resume all token operations. Admin only.
+    pub fn unpause(env: Env) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Paused, &false);
+        bump_instance(&env);
+        Ok(())
+    }
+}
+
+/// Upgrade path — only compiled when the `upgradeable` feature is enabled.
+#[cfg(feature = "upgradeable")]
+#[contractimpl]
+impl TokenContract {
+    /// Upgrade the contract WASM. Admin only.
+    pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        Ok(())
+    }
+}
+
+/// Supply cap — only compiled when the `capped-supply` feature is enabled.
+#[cfg(feature = "capped-supply")]
+#[contractimpl]
+impl TokenContract {
+    /// Return the configured maximum supply cap, or `None` if uncapped.
+    pub fn max_supply(env: Env) -> Option<i128> {
+        env.storage().instance().get(&DataKey::MaxSupply)
+    }
+}
+
 #[contractimpl]
 impl token::TokenInterface for TokenContract {
     fn allowance(env: Env, from: Address, spender: Address) -> i128 {
@@ -190,8 +280,6 @@ impl token::TokenInterface for TokenContract {
                 .temporary()
                 .extend_ttl(&key, expiration_ledger, expiration_ledger);
         }
-        // Emit a distinct revoke event when amount == 0 (allowance revocation),
-        // so off-chain systems can distinguish revocations from normal approvals.
         if amount == 0 {
             events::revoked(&env, &from, &spender);
         } else {
@@ -208,6 +296,10 @@ impl token::TokenInterface for TokenContract {
 
     fn transfer(env: Env, from: Address, to: Address, amount: i128) {
         from.require_auth();
+        #[cfg(feature = "pausable")]
+        if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
         if let Err(e) = Self::transfer_impl(&env, from, to, amount) {
             panic_with_error!(&env, e);
         }
@@ -215,6 +307,10 @@ impl token::TokenInterface for TokenContract {
 
     fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
         spender.require_auth();
+        #[cfg(feature = "pausable")]
+        if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
         let key = DataKey::Allowance(AllowanceDataKey {
             from: from.clone(),
             spender: spender.clone(),
@@ -241,6 +337,10 @@ impl token::TokenInterface for TokenContract {
 
     fn burn(env: Env, from: Address, amount: i128) {
         from.require_auth();
+        #[cfg(feature = "pausable")]
+        if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
         if amount <= 0 {
             panic_with_error!(&env, TokenError::InvalidAmount);
         }
@@ -270,6 +370,10 @@ impl token::TokenInterface for TokenContract {
 
     fn burn_from(env: Env, spender: Address, from: Address, amount: i128) {
         spender.require_auth();
+        #[cfg(feature = "pausable")]
+        if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
         let key = DataKey::Allowance(AllowanceDataKey {
             from: from.clone(),
             spender: spender.clone(),

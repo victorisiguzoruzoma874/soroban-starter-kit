@@ -6,6 +6,11 @@ authors.workspace = true
 description = "A production-ready Soroban token contract template"
 license.workspace = true
 
+[features]
+pausable = []
+upgradeable = []
+capped-supply = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 

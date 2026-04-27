@@ -17,15 +17,20 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
                 },
                 {
-                  "string": "Test Token"
+                  "string": "Capped Token"
                 },
                 {
-                  "string": "TEST"
+                  "string": "CAP"
                 },
                 {
                   "u32": 18
                 },
-                "void"
+                {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 1000
+                  }
+                }
               ]
             }
           },
@@ -58,7 +63,6 @@
         }
       ]
     ],
-    [],
     []
   ],
   "ledger": {
@@ -224,6 +228,21 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "MaxSupply"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "i128": {
+                            "hi": 0,
+                            "lo": 1000
+                          }
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "Metadata"
                             },
                             {
@@ -255,7 +274,7 @@
                           ]
                         },
                         "val": {
-                          "string": "Test Token"
+                          "string": "Capped Token"
                         }
                       },
                       {
@@ -274,7 +293,7 @@
                           ]
                         },
                         "val": {
-                          "string": "TEST"
+                          "string": "CAP"
                         }
                       },
                       {
@@ -350,15 +369,20 @@
                   "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
                 },
                 {
-                  "string": "Test Token"
+                  "string": "Capped Token"
                 },
                 {
-                  "string": "TEST"
+                  "string": "CAP"
                 },
                 {
                   "u32": 18
                 },
-                "void"
+                {
+                  "i128": {
+                    "hi": 0,
+                    "lo": 1000
+                  }
+                }
               ]
             }
           }
@@ -384,10 +408,10 @@
             "data": {
               "vec": [
                 {
-                  "string": "Test Token"
+                  "string": "Capped Token"
                 },
                 {
-                  "string": "TEST"
+                  "string": "CAP"
                 },
                 {
                   "u32": 18
@@ -498,58 +522,6 @@
               }
             ],
             "data": "void"
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": null,
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_call"
-              },
-              {
-                "bytes": "0000000000000000000000000000000000000000000000000000000000000003"
-              },
-              {
-                "symbol": "balance"
-              }
-            ],
-            "data": {
-              "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000003",
-        "type_": "diagnostic",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "fn_return"
-              },
-              {
-                "symbol": "balance"
-              }
-            ],
-            "data": {
-              "i128": {
-                "hi": 0,
-                "lo": 1000
-              }
-            }
           }
         }
       },

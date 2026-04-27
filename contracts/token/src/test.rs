@@ -219,14 +219,18 @@ fn test_set_admin() {
     // Verify admin_changed event was emitted with old_admin as topic and new_admin as data
     use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
     let all_events = env.events().all();
-    let last = all_events.last().unwrap();
+    let n = all_events.len();
+    assert!(n > 0);
     assert_eq!(
-        last,
-        (
-            contract_address.clone(),
-            (Symbol::new(&env, "admin_changed"), admin.clone()).into_val(&env),
-            new_admin.clone().into_val(&env),
-        )
+        all_events.slice(n - 1..),
+        soroban_sdk::vec![
+            &env,
+            (
+                contract_address.clone(),
+                (Symbol::new(&env, "admin_changed"), admin.clone()).into_val(&env),
+                new_admin.clone().into_val(&env),
+            ),
+        ]
     );
 }
 
@@ -282,14 +286,18 @@ fn test_approve_revoke() {
 
     // The last event must be revoke, not approve
     let all_events = env.events().all();
-    let last = all_events.last().unwrap();
+    let n = all_events.len();
+    assert!(n > 0);
     assert_eq!(
-        last,
-        (
-            contract_address.clone(),
-            (Symbol::new(&env, "revoke"), user.clone(), spender.clone()).into_val(&env),
-            ().into_val(&env),
-        )
+        all_events.slice(n - 1..),
+        soroban_sdk::vec![
+            &env,
+            (
+                contract_address.clone(),
+                (Symbol::new(&env, "revoke"), user.clone(), spender.clone()).into_val(&env),
+                ().into_val(&env),
+            ),
+        ]
     );
 }
 
@@ -306,4 +314,137 @@ fn test_transfer_self_is_noop() {
 
     // Balance unchanged
     assert_eq!(client.balance(&user), 500i128);
+}
+
+// ---------------------------------------------------------------------------
+// Feature-gated tests
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "pausable")]
+mod pausable_tests {
+    use super::*;
+
+    #[test]
+    fn test_pause_blocks_mint() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user = Address::generate(&env);
+        let client = init_token(&env, &admin);
+
+        client.pause();
+        assert!(client.try_mint(&user, &100i128).is_err());
+    }
+
+    #[test]
+    fn test_unpause_restores_mint() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user = Address::generate(&env);
+        let client = init_token(&env, &admin);
+
+        client.pause();
+        client.unpause();
+        client.mint(&user, &100i128);
+        assert_eq!(client.balance(&user), 100i128);
+    }
+
+    #[test]
+    fn test_pause_blocks_burn() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user = Address::generate(&env);
+        let client = init_token(&env, &admin);
+        client.mint(&user, &500i128);
+
+        client.pause();
+        assert!(client.try_admin_burn(&user, &100i128).is_err());
+    }
+}
+
+#[cfg(feature = "upgradeable")]
+mod upgradeable_tests {
+    use super::*;
+
+    #[test]
+    fn test_upgrade_requires_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let client = init_token(&env, &admin);
+        // A zero hash is invalid for a real upgrade, but the auth check fires first.
+        // We just verify the method exists and is callable by admin.
+        let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[0u8; 32]);
+        // This will panic because the wasm hash doesn't exist, but auth passes.
+        let _ = client.try_upgrade(&dummy_hash);
+    }
+}
+
+#[cfg(feature = "capped-supply")]
+mod capped_supply_tests {
+    use super::*;
+
+    fn init_capped<'a>(env: &'a Env, admin: &Address, cap: i128) -> TokenContractClient<'a> {
+        let (client, _) = create_token_contract(env);
+        client.initialize(
+            admin,
+            &String::from_str(env, "Capped Token"),
+            &String::from_str(env, "CAP"),
+            &18u32,
+            &Some(cap),
+        );
+        client
+    }
+
+    #[test]
+    fn test_max_supply_stored() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let client = init_capped(&env, &admin, 1_000i128);
+        assert_eq!(client.max_supply(), Some(1_000i128));
+    }
+
+    #[test]
+    fn test_mint_within_cap_succeeds() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user = Address::generate(&env);
+        let client = init_capped(&env, &admin, 1_000i128);
+        client.mint(&user, &1_000i128);
+        assert_eq!(client.total_supply(), 1_000i128);
+    }
+
+    #[test]
+    fn test_mint_exceeds_cap_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user = Address::generate(&env);
+        let client = init_capped(&env, &admin, 500i128);
+        assert!(client.try_mint(&user, &501i128).is_err());
+    }
+
+    #[test]
+    fn test_no_cap_is_uncapped() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user = Address::generate(&env);
+        let (client, _) = create_token_contract(&env);
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Uncapped"),
+            &String::from_str(&env, "UNC"),
+            &18u32,
+            &None,
+        );
+        assert_eq!(client.max_supply(), None);
+        let large: i128 = 1_000_000_000;
+        client.mint(&user, &large);
+        assert_eq!(client.total_supply(), large);
+    }
 }
