@@ -154,6 +154,11 @@ impl TokenContract {
             .get(&DataKey::TotalSupply)
             .unwrap_or(0)
     }
+
+    /// Return the git commit hash baked in at compile time.
+    pub fn version(env: Env) -> String {
+        String::from_str(&env, env!("GIT_HASH"))
+    }
 }
 
 #[contractimpl]
@@ -336,6 +341,22 @@ impl token::TokenInterface for TokenContract {
 }
 
 impl TokenContract {
+    /// Move `amount` tokens from `from` to `to`, updating persistent storage and emitting an event.
+    ///
+    /// # Preconditions (caller must ensure before calling)
+    /// - Caller authorization for `from` has already been checked (`from.require_auth()` or
+    ///   allowance deducted).
+    /// - `amount` is positive (this function also enforces it, but callers should pre-validate).
+    ///
+    /// # What this function validates
+    /// - Returns `Ok(())` immediately when `from == to` (no-op, no event emitted).
+    /// - Returns [`TokenError::InvalidAmount`] if `amount <= 0`.
+    /// - Returns [`TokenError::InsufficientBalance`] if `from`'s balance is less than `amount`.
+    ///
+    /// # What this function does NOT validate
+    /// - Does not check authorization — that is the caller's responsibility.
+    /// - Does not enforce allowances — `transfer_from` deducts the allowance before calling here.
+    /// - Does not check or update `TotalSupply` — supply only changes on mint/burn.
     fn transfer_impl(env: &Env, from: Address, to: Address, amount: i128) -> Result<(), TokenError> {
         if from == to {
             return Ok(());
