@@ -219,6 +219,17 @@ fn test_set_admin() {
     // Verify admin_changed event was emitted with old_admin as topic and new_admin as data
     use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
     let all_events = env.events().all();
+    let n = all_events.len();
+    assert!(n > 0);
+    let expected = soroban_sdk::vec![
+        &env,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "admin_changed"), admin.clone()).into_val(&env),
+            new_admin.clone().into_val(&env),
+        ),
+    ];
+    assert_eq!(all_events.slice(n - 1..), expected);
     let last = all_events.last().unwrap();
     let (addr, topics, data) = last;
     assert_eq!(addr, contract_address);
@@ -282,6 +293,17 @@ fn test_approve_revoke() {
 
     // The last event must be revoke, not approve
     let all_events = env.events().all();
+    let n = all_events.len();
+    assert!(n > 0);
+    let expected = soroban_sdk::vec![
+        &env,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "revoke"), user.clone(), spender.clone()).into_val(&env),
+            ().into_val(&env),
+        ),
+    ];
+    assert_eq!(all_events.slice(n - 1..), expected);
     let last = all_events.last().unwrap();
     let (addr, topics, data) = last;
     assert_eq!(addr, contract_address);
