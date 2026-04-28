@@ -19,8 +19,8 @@ proptest = { workspace = true }
 
 
 [[bin]]
-name = "soroban-escrow-template"
-path = "src/bin/main.rs"
+name = "deploy"
+path = "src/bin/deploy.rs"
 
 [lints]
 workspace = true

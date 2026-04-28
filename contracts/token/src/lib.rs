@@ -155,15 +155,9 @@ impl TokenContract {
             .unwrap_or(0)
     }
 
-    /// Return `Some(balance)` if `id` has ever held tokens, or `None` if the
-    /// address has no storage entry (i.e. it has never received tokens).
-    ///
-    /// Use this instead of [`TokenInterface::balance`] when you need to
-    /// distinguish a genuinely unknown address from one that holds zero tokens.
-    pub fn balance_of(env: Env, id: Address) -> Option<i128> {
-        env.storage()
-            .persistent()
-            .get(&DataKey::Balance(id))
+    /// Return the git commit hash baked in at compile time.
+    pub fn version(env: Env) -> String {
+        String::from_str(&env, env!("GIT_HASH"))
     }
 }
 
@@ -349,6 +343,22 @@ impl token::TokenInterface for TokenContract {
 }
 
 impl TokenContract {
+    /// Move `amount` tokens from `from` to `to`, updating persistent storage and emitting an event.
+    ///
+    /// # Preconditions (caller must ensure before calling)
+    /// - Caller authorization for `from` has already been checked (`from.require_auth()` or
+    ///   allowance deducted).
+    /// - `amount` is positive (this function also enforces it, but callers should pre-validate).
+    ///
+    /// # What this function validates
+    /// - Returns `Ok(())` immediately when `from == to` (no-op, no event emitted).
+    /// - Returns [`TokenError::InvalidAmount`] if `amount <= 0`.
+    /// - Returns [`TokenError::InsufficientBalance`] if `from`'s balance is less than `amount`.
+    ///
+    /// # What this function does NOT validate
+    /// - Does not check authorization — that is the caller's responsibility.
+    /// - Does not enforce allowances — `transfer_from` deducts the allowance before calling here.
+    /// - Does not check or update `TotalSupply` — supply only changes on mint/burn.
     fn transfer_impl(env: &Env, from: Address, to: Address, amount: i128) -> Result<(), TokenError> {
         if from == to {
             return Ok(());

@@ -228,7 +228,7 @@
                           ]
                         },
                         "val": {
-                          "u32": 100
+                          "u32": 200
                         }
                       },
                       {
@@ -264,7 +264,7 @@
                           ]
                         },
                         "val": {
-                          "u32": 3
+                          "u32": 6
                         }
                       },
                       {
@@ -328,7 +328,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000005"
               },
               {
-                "symbol": "initialize"
+                "symbol": "decimals"
               }
             ],
             "data": {
@@ -352,7 +352,7 @@
                   }
                 },
                 {
-                  "u32": 100
+                  "u32": 200
                 }
               ]
             }
@@ -397,40 +397,11 @@
                 "symbol": "fn_return"
               },
               {
-                "symbol": "decimals"
-              }
-            ],
-            "data": {
-              "u32": 18
-            }
-          }
-        }
-      },
-      "failed_call": false
-    },
-    {
-      "event": {
-        "ext": "v0",
-        "contract_id": "0000000000000000000000000000000000000000000000000000000000000005",
-        "type_": "contract",
-        "body": {
-          "v0": {
-            "topics": [
-              {
-                "symbol": "escrow_created"
-              },
-              {
-                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
-              },
-              {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
               }
             ],
             "data": {
-              "i128": {
-                "hi": 0,
-                "lo": 1000
-              }
+              "u32": 18
             }
           }
         }
@@ -727,7 +698,7 @@
               }
             ],
             "data": {
-              "u32": 3
+              "u32": 6
             }
           }
         }
