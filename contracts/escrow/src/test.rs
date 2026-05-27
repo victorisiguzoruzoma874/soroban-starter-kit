@@ -364,6 +364,47 @@ fn test_initialize_invalid_token_address() {
 }
 
 #[test]
+#[should_panic]
+fn test_cancel_by_seller_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, contract_address) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &amount, &deadline);
+
+    // Only authorize the seller — buyer.require_auth() inside cancel() will fail.
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    env.mock_auths(&[MockAuth {
+        address: &seller,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "cancel",
+            args: soroban_sdk::vec![&env].into(),
+            sub_invokes: &[],
+        },
+    }]);
+    client.cancel();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_cancel_after_funded_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // State is now Funded; cancel() requires Created state → InvalidState (#2).
+    client.cancel();
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #7)")]
 fn test_fund_insufficient_funds() {
     let env = Env::default();
