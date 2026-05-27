@@ -8,7 +8,6 @@ soroban-common = { path = "contracts/common", version = "0.1.0" }
 serde = "=1.0.228"
 proc-macro2 = "=1.0.106"
 quote = "=1.0.45"
-soroban-common = { path = "contracts/common" }
 soroban-sdk-testutils = { version = "=21.7.7", package = "soroban-sdk", features = ["testutils"] }
 proptest = "=1.6.0"
 

@@ -75,14 +75,8 @@ impl EscrowContract {
 
         bump_instance(&env);
 
-        env.events().publish(
-            (Symbol::new(&env, "escrow_created"), buyer.clone(), seller.clone()),
-            amount,
-        );
-        env.events().publish(
-            (Symbol::new(&env, "initialized"), buyer.clone(), seller.clone(), arbiter.clone()),
-            amount,
-        );
+        events::escrow_created(&env, &buyer, &seller, amount);
+        events::initialized(&env, &buyer, &seller, &arbiter, amount);
 
         Ok(())
     }
@@ -363,14 +357,13 @@ impl EscrowContract {
         Self::require_state(&env, EscrowState::Delivered)?;
 
         let seller: Address = env.storage().instance().get(&Seller).unwrap();
-        let token_contract: Address = env.storage().instance().get(&TokenContract).unwrap();
         let amount: i128 = env.storage().instance().get(&Amount).unwrap();
 
-        let token_client = token::Client::new(&env, &token_contract);
-        token_client.transfer(&env.current_contract_address(), &seller, &amount);
-
+        // checks-effects-interactions: update state before external call
         env.storage().instance().set(&State, &EscrowState::Completed);
         bump_instance(&env);
+
+        admin::transfer_token(&env, &env.current_contract_address(), &seller, amount);
 
         env.events()
             .publish((Symbol::new(&env, "funds_released"), seller), amount);
@@ -382,14 +375,13 @@ impl EscrowContract {
         Self::require_state(&env, EscrowState::Funded)?;
 
         let buyer: Address = env.storage().instance().get(&Buyer).unwrap();
-        let token_contract: Address = env.storage().instance().get(&TokenContract).unwrap();
         let amount: i128 = env.storage().instance().get(&Amount).unwrap();
 
-        let token_client = token::Client::new(&env, &token_contract);
-        token_client.transfer(&env.current_contract_address(), &buyer, &amount);
-
+        // checks-effects-interactions: update state before external call
         env.storage().instance().set(&State, &EscrowState::Refunded);
         bump_instance(&env);
+
+        admin::transfer_token(&env, &env.current_contract_address(), &buyer, amount);
 
         env.events()
             .publish((Symbol::new(&env, "funds_refunded"), buyer), amount);
