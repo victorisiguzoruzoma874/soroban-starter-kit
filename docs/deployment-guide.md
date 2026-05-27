@@ -225,7 +225,60 @@ node scripts/generate-guides.mjs
 
 ---
 
-## 11. Troubleshooting
+## 11. Contract Upgrades (Timelock)
+
+Both the Token and Escrow contracts enforce a **two-step upgrade process** when
+built with the `upgradeable` / `pausable` feature flags. A minimum delay of
+`UPGRADE_DELAY_LEDGERS` (17 280 ledgers ≈ 24 hours at 5 s/ledger) is enforced
+between proposing and executing a WASM upgrade.
+
+### Step 1 — Propose the upgrade
+
+```bash
+stellar contract invoke \
+  --id <CONTRACT_ID> \
+  --source-account <ADMIN_KEY> \
+  --network testnet \
+  -- propose_upgrade \
+  --wasm_hash <NEW_WASM_HASH>
+```
+
+This stores the hash and a `ready_after` ledger number on-chain and emits an
+`upgrade_proposed` event. Announce the upgrade publicly so users have time to
+review and exit if needed.
+
+### Step 2 — Execute the upgrade (after the timelock)
+
+```bash
+stellar contract invoke \
+  --id <CONTRACT_ID> \
+  --source-account <ADMIN_KEY> \
+  --network testnet \
+  -- execute_upgrade
+```
+
+The call will fail with `NotAuthorized` / `Unauthorized` if the current ledger
+is still before `ready_after`. Once executed, an `upgrade_executed` event is
+emitted and the WASM is replaced atomically.
+
+### Verify the new WASM hash
+
+```bash
+stellar contract info --id <CONTRACT_ID> --network testnet
+```
+
+Compare the reported WASM hash against the expected value before announcing the
+upgrade as complete.
+
+### Security notes
+
+- Never skip the timelock on mainnet. The delay gives users time to react.
+- Gate `propose_upgrade` behind a multi-sig or governance vote for production.
+- Rehearse the full upgrade flow on testnet before executing on mainnet.
+
+---
+
+## 12. Troubleshooting
 
 | Problem | Solution |
 |---------|----------|

@@ -167,13 +167,57 @@ impl TokenContract {
             .unwrap_or(0);
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &(supply.checked_sub(amount).ok_or(TokenError::Overflow)?));
         bump_instance(&env);
         events::burned(&env, &from, amount);
         Ok(())
     }
 
-    /// Transfer admin role to `new_admin`. Current admin only.
+    /// Propose a new admin. Current admin only.
+    ///
+    /// The transfer is not final until `new_admin` calls [`accept_admin`].
+    /// Replaces the one-step `set_admin` to prevent accidental loss of admin
+    /// access from a typo in the new address.
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "admin_proposed"), admin),
+            new_admin,
+        );
+        Ok(())
+    }
+
+    /// Accept a pending admin transfer. Must be called by the pending admin.
+    pub fn accept_admin(env: Env) -> Result<(), TokenError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .ok_or(TokenError::Unauthorized)?;
+        pending.require_auth();
+        let old_admin = require_admin(&env)?;
+        env.storage().instance().set(&DataKey::Admin, &pending);
+        env.storage().instance().remove(&DataKey::PendingAdmin);
+        bump_instance(&env);
+        events::admin_changed(&env, &old_admin, &pending);
+        Ok(())
+    }
+
+    /// Cancel a pending admin transfer. Current admin only.
+    pub fn cancel_admin_transfer(env: Env) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().remove(&DataKey::PendingAdmin);
+        bump_instance(&env);
+        Ok(())
+    }
+
+    /// Deprecated: use `propose_admin` + `accept_admin` instead.
+    ///
+    /// Kept for backwards compatibility. Will be removed in a future version.
     pub fn set_admin(env: Env, new_admin: Address) -> Result<(), TokenError> {
         let old_admin = require_admin(&env)?;
         old_admin.require_auth();
@@ -232,11 +276,48 @@ impl TokenContract {
 #[cfg(feature = "upgradeable")]
 #[contractimpl]
 impl TokenContract {
-    /// Upgrade the contract WASM. Admin only.
-    pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {
+    /// Minimum ledgers between proposing and executing a WASM upgrade (~24 h at 5 s/ledger).
+    const UPGRADE_DELAY_LEDGERS: u32 = 17_280;
+
+    /// Propose a WASM upgrade. Admin only.
+    ///
+    /// Stores `wasm_hash` and a `ready_after` ledger number. The upgrade cannot
+    /// be executed until at least `UPGRADE_DELAY_LEDGERS` ledgers have passed.
+    pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        let ready_after = env.ledger().sequence() + Self::UPGRADE_DELAY_LEDGERS;
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgrade, &(wasm_hash.clone(), ready_after));
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "upgrade_proposed"), admin),
+            (wasm_hash, ready_after),
+        );
+        Ok(())
+    }
+
+    /// Execute a previously proposed WASM upgrade. Admin only.
+    ///
+    /// Fails if no upgrade has been proposed or if the timelock has not yet elapsed.
+    pub fn execute_upgrade(env: Env) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(TokenError::Unauthorized)?;
+        if env.ledger().sequence() < ready_after {
+            return Err(TokenError::Unauthorized);
+        }
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "upgrade_executed"), admin),
+            wasm_hash.clone(),
+        );
+        env.deployer().update_current_contract_wasm(wasm_hash);
         Ok(())
     }
 }
@@ -368,9 +449,13 @@ impl token::TokenInterface for TokenContract {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = match supply.checked_sub(amount) {
+            Some(v) => v,
+            None => panic_with_error!(&env, TokenError::Overflow),
+        };
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         bump_instance(&env);
         events::burned(&env, &from, amount);
     }
@@ -417,9 +502,13 @@ impl token::TokenInterface for TokenContract {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = match supply.checked_sub(amount) {
+            Some(v) => v,
+            None => panic_with_error!(&env, TokenError::Overflow),
+        };
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply - amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         bump_instance(&env);
         events::burned(&env, &from, amount);
     }

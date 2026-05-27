@@ -323,6 +323,9 @@ impl EscrowContract {
 #[cfg(feature = "pausable")]
 #[contractimpl]
 impl EscrowContract {
+    /// Minimum ledgers between proposing and executing a WASM upgrade (~24 h at 5 s/ledger).
+    const UPGRADE_DELAY_LEDGERS: u32 = 17_280;
+
     /// Pause the contract. Admin only.
     pub fn pause(env: Env) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
@@ -337,11 +340,45 @@ impl EscrowContract {
         soroban_sdk::String::from_str(&env, env!("GIT_HASH"))
     }
 
-    /// Upgrade the contract to a new WASM hash. Admin only.
-    pub fn upgrade(env: Env, new_wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), EscrowError> {
+    /// Propose a WASM upgrade. Admin only.
+    ///
+    /// Stores `wasm_hash` and a `ready_after` ledger number. The upgrade cannot
+    /// be executed until at least `UPGRADE_DELAY_LEDGERS` ledgers have passed.
+    pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
+        let ready_after = env.ledger().sequence() + Self::UPGRADE_DELAY_LEDGERS;
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingUpgrade, &(wasm_hash.clone(), ready_after));
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "upgrade_proposed"), admin),
+            (wasm_hash, ready_after),
+        );
+        Ok(())
+    }
+
+    /// Execute a previously proposed WASM upgrade. Admin only.
+    ///
+    /// Fails if no upgrade has been proposed or if the timelock has not yet elapsed.
+    pub fn execute_upgrade(env: Env) -> Result<(), EscrowError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingUpgrade)
+            .ok_or(EscrowError::NotAuthorized)?;
+        if env.ledger().sequence() < ready_after {
+            return Err(EscrowError::NotAuthorized);
+        }
+        env.storage().instance().remove(&DataKey::PendingUpgrade);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "upgrade_executed"), admin),
+            wasm_hash.clone(),
+        );
+        env.deployer().update_current_contract_wasm(wasm_hash);
         Ok(())
     }
 }

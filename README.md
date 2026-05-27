@@ -125,6 +125,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 - [Soroban Examples](https://github.com/stellar/soroban-examples)
 - [Freighter Wallet](https://freighter.app/)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
+- [Security Best Practices](docs/security.md)
 
 ## 📄 License
 

@@ -161,7 +161,11 @@ See `src/components/ContractInteractionUI.tsx` for a full working example.
 - Validate all user inputs before constructing `xdr.ScVal` arguments
 - Use `server.simulateTransaction()` before submitting to catch errors cheaply
 - Restrict admin operations to known addresses in contract initialization
-- Rotate admin keys using the contract's `set_admin` function after deployment
+- Rotate admin keys using the two-step `propose_admin` / `accept_admin` flow
+
+For a full security guide covering key management, replay attack prevention,
+front-running, upgrade timelocks, and event monitoring, see
+[docs/security.md](security.md).
 
 ---
 
