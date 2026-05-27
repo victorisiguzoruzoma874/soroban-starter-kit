@@ -388,6 +388,17 @@ fn test_fund_insufficient_funds() {
 }
 
 
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_request_refund_before_deadline_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // Deadline is sequence + 100; current sequence is 0 → deadline not reached → DeadlineNotReached (#4)
+    client.request_refund();
+}
+
 // ---------------------------------------------------------------------------
 // Feature-gated tests
 // ---------------------------------------------------------------------------
