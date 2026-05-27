@@ -1,4 +1,4 @@
-use soroban_sdk::{Address, Env, String, Symbol};
+use soroban_sdk::{Address, BytesN, Env, String, Symbol};
 
 pub fn initialized(env: &Env, admin: &Address, name: String, symbol: String, decimals: u32) {
     env.events().publish((Symbol::new(env, "initialized"), admin.clone()), (name, symbol, decimals));
@@ -26,4 +26,16 @@ pub fn revoked(env: &Env, from: &Address, spender: &Address) {
 
 pub fn transferred(env: &Env, from: &Address, to: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "transfer"), from.clone(), to.clone()), amount);
+}
+
+pub fn paused(env: &Env, admin: &Address) {
+    env.events().publish((Symbol::new(env, "paused"), admin.clone()), ());
+}
+
+pub fn unpaused(env: &Env, admin: &Address) {
+    env.events().publish((Symbol::new(env, "unpaused"), admin.clone()), ());
+}
+
+pub fn upgraded(env: &Env, admin: &Address, new_wasm_hash: &soroban_sdk::BytesN<32>) {
+    env.events().publish((Symbol::new(env, "upgraded"), admin.clone()), new_wasm_hash.clone());
 }

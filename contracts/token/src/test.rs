@@ -221,6 +221,15 @@ fn test_set_admin() {
     let all_events = env.events().all();
     let n = all_events.len();
     assert!(n > 0);
+    let expected = soroban_sdk::vec![
+        &env,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "admin_changed"), admin.clone()).into_val(&env),
+            new_admin.clone().into_val(&env),
+        ),
+    ];
+    assert_eq!(all_events.slice(n - 1..), expected);
     assert_eq!(
         all_events.slice(n - 1..),
         soroban_sdk::vec![
@@ -288,6 +297,15 @@ fn test_approve_revoke() {
     let all_events = env.events().all();
     let n = all_events.len();
     assert!(n > 0);
+    let expected = soroban_sdk::vec![
+        &env,
+        (
+            contract_address.clone(),
+            (Symbol::new(&env, "revoke"), user.clone(), spender.clone()).into_val(&env),
+            ().into_val(&env),
+        ),
+    ];
+    assert_eq!(all_events.slice(n - 1..), expected);
     assert_eq!(
         all_events.slice(n - 1..),
         soroban_sdk::vec![
@@ -362,6 +380,39 @@ mod pausable_tests {
         client.pause();
         assert!(client.try_admin_burn(&user, &100i128).is_err());
     }
+
+    #[test]
+    fn test_pause_emits_event() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let client = init_token(&env, &admin);
+
+        client.pause();
+
+        use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+        let all = env.events().all();
+        let last = all.last().unwrap();
+        let (_, topics, _) = last;
+        assert_eq!(topics, (Symbol::new(&env, "paused"), admin).into_val(&env));
+    }
+
+    #[test]
+    fn test_unpause_emits_event() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let client = init_token(&env, &admin);
+
+        client.pause();
+        client.unpause();
+
+        use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+        let all = env.events().all();
+        let last = all.last().unwrap();
+        let (_, topics, _) = last;
+        assert_eq!(topics, (Symbol::new(&env, "unpaused"), admin).into_val(&env));
+    }
 }
 
 #[cfg(feature = "upgradeable")]
@@ -379,6 +430,24 @@ mod upgradeable_tests {
         let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[0u8; 32]);
         // This will panic because the wasm hash doesn't exist, but auth passes.
         let _ = client.try_upgrade(&dummy_hash);
+    }
+
+    #[test]
+    fn test_upgrade_emits_event() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let client = init_token(&env, &admin);
+        let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[1u8; 32]);
+        // upgraded event is emitted before update_current_contract_wasm
+        let _ = client.try_upgrade(&dummy_hash);
+
+        use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+        let all = env.events().all();
+        let found = all.iter().any(|(_, topics, _)| {
+            topics == (Symbol::new(&env, "upgraded"), admin.clone()).into_val(&env)
+        });
+        assert!(found, "upgraded event not emitted");
     }
 }
 
@@ -458,10 +527,11 @@ fn test_balance_of_distinguishes_unknown_from_zero() {
     let unknown = Address::generate(&env);
     let client = init_token(&env, &admin);
 
+    // Unknown address returns 0
     // Unknown address has no storage entry
     assert_eq!(client.balance(&unknown), 0i128);
 
-    // After minting and burning to zero, entry exists with value 0
+    // After minting and burning to zero, balance is still 0
     client.mint(&user, &100i128);
     client.burn(&user, &100i128);
     assert_eq!(client.balance(&user), 0i128);

@@ -38,6 +38,10 @@ pub struct EscrowContract;
 #[contractimpl]
 impl EscrowContract {
     /// Initialize a new escrow. Must be called exactly once.
+    ///
+    /// `token_contract` must be a valid Soroban token contract that implements the
+    /// token interface (i.e. responds to `decimals()`). Passing an address that does
+    /// not implement the token interface will cause this call to panic.
     pub fn initialize(
         env: Env,
         buyer: Address,
@@ -60,8 +64,10 @@ impl EscrowContract {
             return Err(EscrowError::DeadlinePassed);
         }
 
+        // Validate that token_contract is a real token by calling decimals().
+        // This panics if the address does not implement the token interface.
         let token_client = token::Client::new(&env, &token_contract);
-        let _ = token_client.decimals();
+        token_client.decimals();
 
         env.storage().instance().set(&Buyer, &buyer);
         env.storage().instance().set(&Seller, &seller);
@@ -112,6 +118,9 @@ impl EscrowContract {
         let amount: i128 = env.storage().instance().get(&Amount).unwrap();
 
         let token_client = token::Client::new(&env, &token_contract);
+        if token_client.balance(&buyer) < amount {
+            return Err(EscrowError::InsufficientFunds);
+        }
         token_client.transfer(&buyer, &env.current_contract_address(), &amount);
 
         env.storage().instance().set(&State, &EscrowState::Funded);
@@ -332,6 +341,17 @@ impl EscrowContract {
         admin.require_auth();
         env.storage().instance().set(&Paused, &true);
         bump_instance(&env);
+        events::paused(&env, &admin);
+        Ok(())
+    }
+
+    /// Unpause the contract. Admin only.
+    pub fn unpause(env: Env) -> Result<(), EscrowError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&Paused, &false);
+        bump_instance(&env);
+        events::unpaused(&env, &admin);
         Ok(())
     }
 
@@ -365,6 +385,8 @@ impl EscrowContract {
     pub fn execute_upgrade(env: Env) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
+        events::upgraded(&env, &admin, &new_wasm_hash);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
         let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
             .storage()
             .instance()

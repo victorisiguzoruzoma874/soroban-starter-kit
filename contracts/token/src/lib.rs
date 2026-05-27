@@ -259,6 +259,7 @@ impl TokenContract {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
         bump_instance(&env);
+        events::paused(&env, &admin);
         Ok(())
     }
 
@@ -268,6 +269,7 @@ impl TokenContract {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &false);
         bump_instance(&env);
+        events::unpaused(&env, &admin);
         Ok(())
     }
 }
@@ -304,6 +306,8 @@ impl TokenContract {
     pub fn execute_upgrade(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
+        events::upgraded(&env, &admin, &new_wasm_hash);
+        env.deployer().update_current_contract_wasm(new_wasm_hash);
         let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
             .storage()
             .instance()

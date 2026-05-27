@@ -8,7 +8,8 @@ use soroban_sdk::{
 };
 
 // ---------------------------------------------------------------------------
-// MockToken — a no-op token contract so cross-contract calls don't panic
+// MockToken — a no-op token contract so cross-contract calls don't panic.
+// Balance defaults to i128::MAX; set DataKey::Balance(addr) to override.
 // ---------------------------------------------------------------------------
 
 #[contract]
@@ -29,8 +30,11 @@ impl token::TokenInterface for MockToken {
     ) {
     }
 
-    fn balance(_env: Env, _id: Address) -> i128 {
-        i128::MAX
+    fn balance(env: Env, id: Address) -> i128 {
+        env.storage()
+            .instance()
+            .get::<Address, i128>(&id)
+            .unwrap_or(i128::MAX)
     }
 
     fn transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {}
@@ -341,6 +345,47 @@ fn test_arbiter_resolve_to_buyer() {
     assert!(!env.events().all().is_empty());
 }
 
+#[test]
+#[should_panic]
+fn test_initialize_invalid_token_address() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    // Use a random address that has no contract — decimals() will panic.
+    let invalid_token = Address::generate(&env);
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &invalid_token, &amount, &deadline);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_fund_insufficient_funds() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 100;
+
+    // Set buyer's balance to 0 in the mock token's storage
+    env.as_contract(&token, || {
+        env.storage().instance().set(&buyer, &0i128);
+    });
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &amount, &deadline);
+    // buyer has balance 0 < amount 1000 → InsufficientFunds (#7)
+    client.fund();
+}
 
 
 // ---------------------------------------------------------------------------
@@ -393,6 +438,37 @@ mod pausable_tests {
         client.fund();
         assert_eq!(client.get_state(), Some(EscrowState::Funded));
     }
+
+    #[test]
+    fn test_pause_emits_event() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, admin, _buyer) = setup_with_admin(&env);
+
+        client.pause();
+
+        use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+        let all = env.events().all();
+        let last = all.last().unwrap();
+        let (_, topics, _) = last;
+        assert_eq!(topics, (Symbol::new(&env, "paused"), admin).into_val(&env));
+    }
+
+    #[test]
+    fn test_unpause_emits_event() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let (client, admin, _buyer) = setup_with_admin(&env);
+
+        client.pause();
+        client.unpause();
+
+        use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+        let all = env.events().all();
+        let last = all.last().unwrap();
+        let (_, topics, _) = last;
+        assert_eq!(topics, (Symbol::new(&env, "unpaused"), admin).into_val(&env));
+    }
 }
 
 #[cfg(feature = "upgradeable")]
@@ -413,5 +489,29 @@ mod upgradeable_tests {
         let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[0u8; 32]);
         // Auth passes; the upgrade itself fails because the hash is invalid.
         let _ = client.try_upgrade(&dummy_hash);
+    }
+
+    #[test]
+    fn test_upgrade_emits_event() {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let (client, contract_address, ..) = setup_funded_escrow(&env);
+        let admin = Address::generate(&env);
+        env.as_contract(&contract_address, || {
+            env.storage().instance().set(&AdminKey::Admin, &admin);
+        });
+        let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[1u8; 32]);
+        // The upgraded event is emitted before update_current_contract_wasm, so
+        // even though the call fails (invalid hash), the event is still captured.
+        let _ = client.try_upgrade(&dummy_hash);
+
+        use soroban_sdk::{testutils::Events as _, IntoVal, Symbol};
+        let all = env.events().all();
+        // Find the upgraded event
+        let found = all.iter().any(|(_, topics, _)| {
+            topics == (Symbol::new(&env, "upgraded"), admin.clone()).into_val(&env)
+        });
+        assert!(found, "upgraded event not emitted");
     }
 }
