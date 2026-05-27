@@ -334,6 +334,22 @@ fn test_transfer_self_is_noop() {
     assert_eq!(client.balance(&user), 500i128);
 }
 
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_mint_overflow() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.mint(&user, &i128::MAX);
+    assert_eq!(client.total_supply(), i128::MAX);
+
+    // Minting 1 more overflows i128 → Overflow (#7)
+    client.mint(&user, &1i128);
+}
+
 // ---------------------------------------------------------------------------
 // Feature-gated tests
 // ---------------------------------------------------------------------------
