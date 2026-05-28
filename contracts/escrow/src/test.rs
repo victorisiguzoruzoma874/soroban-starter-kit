@@ -388,6 +388,17 @@ fn test_fund_insufficient_funds() {
 }
 
 
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_approve_delivery_without_mark_delivered_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // Escrow is Funded; approve_delivery requires Delivered state → InvalidState (#2)
+    client.approve_delivery();
+}
+
 // ---------------------------------------------------------------------------
 // Feature-gated tests
 // ---------------------------------------------------------------------------
