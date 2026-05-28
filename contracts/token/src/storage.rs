@@ -15,6 +15,8 @@ pub enum DataKey {
     MaxSupply,
     /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
     PendingUpgrade,
+    /// Instance storage – pending admin address for two-step admin transfer.
+    PendingAdmin,
 }
 
 #[contracttype]

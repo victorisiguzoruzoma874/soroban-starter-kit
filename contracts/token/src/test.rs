@@ -527,18 +527,19 @@ fn test_balance_of_distinguishes_unknown_from_zero() {
     let unknown = Address::generate(&env);
     let client = init_token(&env, &admin);
 
-    // Unknown address returns 0
-    // Unknown address has no storage entry
+    // Unknown address has no storage entry — balance_of returns None
+    assert_eq!(client.balance_of(&unknown), None);
+    // balance() returns 0 for unknown (indistinguishable from zero balance)
     assert_eq!(client.balance(&unknown), 0i128);
 
-    // After minting and burning to zero, balance is still 0
+    // After minting and burning to zero, the entry exists with value 0
     client.mint(&user, &100i128);
     client.burn(&user, &100i128);
     assert_eq!(client.balance(&user), 0i128);
 
-    // balance() returns 0 for both — indistinguishable
-    assert_eq!(client.balance(&unknown), 0i128);
-    assert_eq!(client.balance(&user), 0i128);
+    // balance_of distinguishes: known-zero address returns Some(0), unknown returns None
+    assert_eq!(client.balance_of(&user), Some(0i128));
+    assert_eq!(client.balance_of(&unknown), None);
 }
 
 #[test]

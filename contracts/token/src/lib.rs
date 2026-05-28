@@ -243,6 +243,19 @@ impl TokenContract {
             .unwrap_or(0)
     }
 
+    /// Return `Some(balance)` if `id` has an entry in storage, or `None` if the
+    /// address has never held tokens.
+    ///
+    /// Unlike [`balance`] (which returns `0` for both unknown addresses and
+    /// addresses with a zero balance), `balance_of` lets callers distinguish
+    /// between "never seen this address" (`None`) and "address exists with a
+    /// zero balance" (`Some(0)`).
+    pub fn balance_of(env: Env, id: Address) -> Option<i128> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Balance(id))
+    }
+
     /// Return the git commit hash baked in at compile time.
     pub fn version(env: Env) -> String {
         String::from_str(&env, env!("GIT_HASH"))
