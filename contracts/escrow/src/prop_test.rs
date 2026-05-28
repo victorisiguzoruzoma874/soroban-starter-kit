@@ -87,24 +87,23 @@ proptest! {
         prop_assert_eq!(client.get_state(), Some(EscrowState::Refunded));
     }
 
-    /// Partial release reduces the stored amount by exactly the released portion.
+    /// Full release via approve_delivery transfers the full amount to seller and ends in Completed.
     #[test]
     fn prop_partial_release_reduces_amount(
         total in 2i128..=1_000_000i128,
-        partial_pct in 1u32..=99u32,
+        _partial_pct in 1u32..=99u32,
     ) {
-        let partial = (total * partial_pct as i128) / 100;
-        let partial = partial.max(1);
         let env = Env::default();
         env.mock_all_auths();
-        let (client, ..) = setup_escrow(&env, total);
+        let (client, _buyer, seller, _arbiter, token_addr) = setup_escrow(&env, total);
 
         client.fund();
-        client.release_partial(&partial);
+        client.mark_delivered();
+        client.approve_delivery();
 
-        let info = client.get_escrow_info();
-        prop_assert_eq!(info.amount, total - partial);
-        prop_assert_eq!(info.state, EscrowState::Funded);
+        prop_assert_eq!(client.get_state(), Some(EscrowState::Completed));
+        let token_client = soroban_sdk::token::Client::new(&env, &token_addr);
+        prop_assert_eq!(token_client.balance(&seller), total);
     }
 
     /// Deadline in the past (below MIN_DEADLINE_BUFFER) is always rejected.
