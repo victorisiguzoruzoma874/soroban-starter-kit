@@ -184,6 +184,38 @@ fn test_initialize_past_deadline() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_initialize_zero_amount_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &0, &deadline);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_initialize_negative_amount_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &-1, &deadline);
+}
+
+#[test]
 fn test_initialize_escrow() {
     let env = Env::default();
     env.mock_all_auths();
