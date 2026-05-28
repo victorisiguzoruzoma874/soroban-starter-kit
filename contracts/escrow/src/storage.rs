@@ -52,6 +52,36 @@ pub enum EscrowState {
     Cancelled = 6,
 }
 
+impl core::fmt::Display for EscrowState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            EscrowState::Created => "created",
+            EscrowState::Funded => "funded",
+            EscrowState::Delivered => "delivered",
+            EscrowState::Disputed => "disputed",
+            EscrowState::Completed => "completed",
+            EscrowState::Refunded => "refunded",
+            EscrowState::Cancelled => "cancelled",
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::EscrowState;
+
+    #[test]
+    fn test_escrow_state_display() {
+        assert_eq!(EscrowState::Created.to_string(), "created");
+        assert_eq!(EscrowState::Funded.to_string(), "funded");
+        assert_eq!(EscrowState::Delivered.to_string(), "delivered");
+        assert_eq!(EscrowState::Disputed.to_string(), "disputed");
+        assert_eq!(EscrowState::Completed.to_string(), "completed");
+        assert_eq!(EscrowState::Refunded.to_string(), "refunded");
+        assert_eq!(EscrowState::Cancelled.to_string(), "cancelled");
+    }
+}
+
 /// Snapshot of all escrow fields returned by
 /// [`EscrowContract::get_escrow_info`](crate::EscrowContract::get_escrow_info).
 #[contracttype]
