@@ -267,6 +267,17 @@ fn test_unauthorized_set_admin_fails() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #5)")]
+fn test_set_admin_before_initialize_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let new_admin = Address::generate(&env);
+    let (client, _) = create_token_contract(&env);
+    // Call set_admin before initialize — should panic with NotInitialized (#5)
+    client.set_admin(&new_admin);
+}
+
+#[test]
 fn test_approve_revoke() {
     let env = Env::default();
     env.mock_all_auths();
