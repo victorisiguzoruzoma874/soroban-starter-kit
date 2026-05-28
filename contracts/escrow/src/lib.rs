@@ -388,8 +388,6 @@ impl EscrowContract {
     pub fn execute_upgrade(env: Env) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
-        events::upgraded(&env, &admin, &new_wasm_hash);
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
         let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
             .storage()
             .instance()
@@ -399,6 +397,7 @@ impl EscrowContract {
             return Err(EscrowError::NotAuthorized);
         }
         env.storage().instance().remove(&DataKey::PendingUpgrade);
+        events::upgraded(&env, &admin, &wasm_hash);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "upgrade_executed"), admin),
             wasm_hash.clone(),
