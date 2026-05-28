@@ -651,3 +651,17 @@ fn test_burn_more_than_total_supply_returns_overflow() {
     // We test admin_burn since it returns Result (burn panics).
     assert!(client.try_admin_burn(&user, &200i128).is_err());
 }
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_unauthorized_admin_burn_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user, &500i128);
+    // clear all auths so the next call has no authorization
+    env.set_auths(&[]);
+    client.admin_burn(&user, &100i128);
+}
