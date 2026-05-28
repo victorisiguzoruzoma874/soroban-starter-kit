@@ -387,6 +387,15 @@ fn test_fund_insufficient_funds() {
     client.fund();
 }
 
+#[test]
+#[should_panic]
+fn test_get_escrow_info_uninitialized_panics() {
+    let env = Env::default();
+    let (client, _) = create_escrow_contract(&env);
+    // Calling get_escrow_info on uninitialized contract should panic
+    let _ = client.get_escrow_info();
+}
+
 
 // ---------------------------------------------------------------------------
 // Feature-gated tests
