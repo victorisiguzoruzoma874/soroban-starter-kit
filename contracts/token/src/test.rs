@@ -654,6 +654,36 @@ fn test_burn_more_than_total_supply_returns_overflow() {
 }
 
 #[test]
+fn test_transfer_from_preserves_expiration() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user1, &1000i128);
+    
+    // Approve with a specific expiration
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&user1, &spender, &500i128, &expiration);
+    assert_eq!(client.allowance(&user1, &spender), 500i128);
+    
+    // Perform a partial transfer_from
+    client.transfer_from(&spender, &user1, &user2, &200i128);
+    assert_eq!(client.balance(&user1), 800i128);
+    assert_eq!(client.balance(&user2), 200i128);
+    assert_eq!(client.allowance(&user1, &spender), 300i128);
+    
+    // Verify expiration is still the original value (not extended)
+    // by advancing ledger and checking allowance is still valid
+    env.ledger().with_mut(|l| l.sequence_number = expiration - 1);
+    assert_eq!(client.allowance(&user1, &spender), 300i128);
+    
+    // Advance past original expiration
+    env.ledger().with_mut(|l| l.sequence_number = expiration + 1);
+    // Allowance should now be expired (return 0)
+    assert_eq!(client.allowance(&user1, &spender), 0i128);
 fn test_burn_from() {
     let env = Env::default();
     env.mock_all_auths();

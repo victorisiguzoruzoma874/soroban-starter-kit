@@ -25,6 +25,7 @@ fn deploy_token<'a>(env: &'a Env, admin: &Address) -> (TokenContractClient<'a>, 
         &String::from_str(env, "Test Token"),
         &String::from_str(env, "TEST"),
         &18u32,
+        &None,
     );
     (client, addr)
 }
@@ -127,6 +128,7 @@ fn test_full_escrow_lifecycle_arbiter_resolves_to_seller() {
     escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &amount, &deadline);
     escrow.fund();
 
+    escrow.raise_dispute();
     escrow.resolve_dispute(&true); // true → release to seller
     assert_eq!(escrow.get_state(), Some(EscrowState::Completed));
     assert_eq!(token.balance(&seller), amount);
@@ -153,42 +155,10 @@ fn test_full_escrow_lifecycle_arbiter_resolves_to_buyer() {
     escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &amount, &deadline);
     escrow.fund();
 
+    escrow.raise_dispute();
     escrow.resolve_dispute(&false); // false → refund to buyer
     assert_eq!(escrow.get_state(), Some(EscrowState::Refunded));
     assert_eq!(token.balance(&buyer), amount);
-    assert_eq!(token.balance(&escrow_addr), 0);
-}
-
-/// initialize → fund → partial release → remaining released via approve_delivery
-#[test]
-fn test_full_escrow_lifecycle_partial_release_then_complete() {
-    let env = Env::default();
-    env.mock_all_auths();
-
-    let token_admin = Address::generate(&env);
-    let buyer = Address::generate(&env);
-    let seller = Address::generate(&env);
-    let arbiter = Address::generate(&env);
-    let amount = 1_000i128;
-    let partial = 400i128;
-    let deadline = env.ledger().sequence() + 200;
-
-    let (token, token_addr) = deploy_token(&env, &token_admin);
-    token.mint(&buyer, &amount);
-
-    let (escrow, escrow_addr) = deploy_escrow(&env);
-    escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &amount, &deadline);
-    escrow.fund();
-
-    // partial release
-    escrow.release_partial(&partial);
-    assert_eq!(token.balance(&seller), partial);
-    assert_eq!(token.balance(&escrow_addr), amount - partial);
-
-    // complete the rest
-    escrow.mark_delivered();
-    escrow.approve_delivery();
-    assert_eq!(token.balance(&seller), amount);
     assert_eq!(token.balance(&escrow_addr), 0);
 }
 

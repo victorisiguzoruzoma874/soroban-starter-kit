@@ -16,7 +16,9 @@ check_prerequisites() {
 check_prerequisites
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONTRACTS_DIR="$ROOT/soroban-starter-kit/contracts"
+CONTRACTS_DIR="$ROOT/contracts"
+
+[[ -d "$CONTRACTS_DIR" ]] || { echo "Contracts directory not found: $CONTRACTS_DIR"; exit 1; }
 
 NETWORK="${1:-testnet}"
 CONTRACT="${2:-all}"

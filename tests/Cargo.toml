@@ -1,0 +1,14 @@
+[package]
+name = "soroban-integration-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-token-template = { path = "../contracts/token" }
+soroban-escrow-template = { path = "../contracts/escrow" }
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
