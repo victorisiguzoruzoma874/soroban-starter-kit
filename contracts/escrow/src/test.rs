@@ -319,6 +319,30 @@ fn test_mark_delivered() {
 }
 
 #[test]
+#[should_panic]
+fn test_mark_delivered_by_buyer_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _, _, _, _, _) = setup_funded_escrow(&env);
+    // Clear auths so seller auth is not present — mark_delivered requires seller
+    env.set_auths(&[]);
+    client.mark_delivered();
+}
+
+#[test]
+#[should_panic]
+fn test_mark_delivered_by_arbiter_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _, _, _, _, _) = setup_funded_escrow(&env);
+    // Clear auths so seller auth is not present — mark_delivered requires seller
+    env.set_auths(&[]);
+    client.mark_delivered();
+}
+
+#[test]
 fn test_approve_delivery() {
     let env = Env::default();
     env.mock_all_auths();
