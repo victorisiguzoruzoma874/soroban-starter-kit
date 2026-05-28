@@ -127,3 +127,36 @@ rustup target add wasm32-unknown-unknown
 **Freighter wallet not connecting**
 - Install the [Freighter extension](https://freighter.app)
 - Switch Freighter to the matching network (Testnet / Mainnet)
+
+---
+
+## Secrets Management
+
+### Golden rules
+
+- **Never commit `.env`** — it is listed in `.gitignore`. If you accidentally stage it, run `git reset HEAD .env`.
+- **Never commit real keys, mnemonics, or tokens** — not even in comments or test fixtures.
+- **`.env.example` is the source of truth** for which variables exist. It must contain only placeholder values (e.g. `SXXX…`, `your-api-key-here`).
+- **Rotate immediately** if a secret is ever pushed to a remote branch. Treat the key as permanently compromised regardless of whether the commit was later removed.
+
+### Local setup
+
+```bash
+cp .env.example .env   # create your local config from the template
+# edit .env and fill in real values — this file is gitignored
+```
+
+### Sharing configuration between developers
+
+Share the *shape* of config (variable names, descriptions) via `.env.example`. Share actual values through a secrets manager (e.g. AWS Secrets Manager, 1Password, Doppler) or an encrypted channel — never via chat, email, or a repository.
+
+### Pre-commit hook
+
+A sample hook lives at `.githooks/pre-commit`. Enable it once per clone:
+
+```bash
+git config core.hooksPath .githooks
+chmod +x .githooks/pre-commit
+```
+
+The hook blocks commits that contain common secret patterns (Stellar secret keys, mnemonics, bearer tokens, API keys) or that stage a `.env` file directly.
