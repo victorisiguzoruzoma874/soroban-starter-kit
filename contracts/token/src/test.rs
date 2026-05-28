@@ -197,6 +197,32 @@ fn test_mint_zero_amount() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_transfer_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let other = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user, &1000i128);
+    client.transfer(&user, &other, &0i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_transfer_negative_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let other = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user, &1000i128);
+    client.transfer(&user, &other, &-1i128);
+}
+
+#[test]
 fn test_set_admin() {
     let env = Env::default();
     env.mock_all_auths();
@@ -332,6 +358,22 @@ fn test_transfer_self_is_noop() {
 
     // Balance unchanged
     assert_eq!(client.balance(&user), 500i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_mint_overflow() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.mint(&user, &i128::MAX);
+    assert_eq!(client.total_supply(), i128::MAX);
+
+    // Minting 1 more overflows i128 → Overflow (#7)
+    client.mint(&user, &1i128);
 }
 
 // ---------------------------------------------------------------------------
@@ -527,18 +569,19 @@ fn test_balance_of_distinguishes_unknown_from_zero() {
     let unknown = Address::generate(&env);
     let client = init_token(&env, &admin);
 
-    // Unknown address returns 0
-    // Unknown address has no storage entry
+    // Unknown address has no storage entry — balance_of returns None
+    assert_eq!(client.balance_of(&unknown), None);
+    // balance() returns 0 for unknown (indistinguishable from zero balance)
     assert_eq!(client.balance(&unknown), 0i128);
 
-    // After minting and burning to zero, balance is still 0
+    // After minting and burning to zero, the entry exists with value 0
     client.mint(&user, &100i128);
     client.burn(&user, &100i128);
     assert_eq!(client.balance(&user), 0i128);
 
-    // balance() returns 0 for both — indistinguishable
-    assert_eq!(client.balance(&unknown), 0i128);
-    assert_eq!(client.balance(&user), 0i128);
+    // balance_of distinguishes: known-zero address returns Some(0), unknown returns None
+    assert_eq!(client.balance_of(&user), Some(0i128));
+    assert_eq!(client.balance_of(&unknown), None);
 }
 
 #[test]
@@ -608,4 +651,106 @@ fn test_burn_more_than_total_supply_returns_overflow() {
     // Directly burning more than total_supply should return an error.
     // We test admin_burn since it returns Result (burn panics).
     assert!(client.try_admin_burn(&user, &200i128).is_err());
+}
+
+#[test]
+fn test_transfer_from_preserves_expiration() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user1, &1000i128);
+    
+    // Approve with a specific expiration
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&user1, &spender, &500i128, &expiration);
+    assert_eq!(client.allowance(&user1, &spender), 500i128);
+    
+    // Perform a partial transfer_from
+    client.transfer_from(&spender, &user1, &user2, &200i128);
+    assert_eq!(client.balance(&user1), 800i128);
+    assert_eq!(client.balance(&user2), 200i128);
+    assert_eq!(client.allowance(&user1, &spender), 300i128);
+    
+    // Verify expiration is still the original value (not extended)
+    // by advancing ledger and checking allowance is still valid
+    env.ledger().with_mut(|l| l.sequence_number = expiration - 1);
+    assert_eq!(client.allowance(&user1, &spender), 300i128);
+    
+    // Advance past original expiration
+    env.ledger().with_mut(|l| l.sequence_number = expiration + 1);
+    // Allowance should now be expired (return 0)
+    assert_eq!(client.allowance(&user1, &spender), 0i128);
+fn test_burn_from() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&owner, &1000i128);
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&owner, &spender, &400i128, &expiration);
+
+    client.burn_from(&spender, &owner, &250i128);
+
+    assert_eq!(client.balance(&owner), 750i128);
+    assert_eq!(client.total_supply(), 750i128);
+    assert_eq!(client.allowance(&owner, &spender), 150i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_burn_from_insufficient_allowance() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&owner, &1000i128);
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&owner, &spender, &100i128, &expiration);
+
+    client.burn_from(&spender, &owner, &101i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_burn_from_expired_allowance() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&owner, &1000i128);
+    let expiration = env.ledger().sequence() + 10;
+    client.approve(&owner, &spender, &500i128, &expiration);
+    env.ledger().set(soroban_sdk::testutils::LedgerInfo {
+        timestamp: 0,
+        protocol_version: 22,
+        sequence_number: expiration + 1,
+        network_id: Default::default(),
+        base_reserve: 10,
+        min_temp_entry_ttl: 1,
+        min_persistent_entry_ttl: 1,
+        max_entry_ttl: 6_312_000,
+    });
+
+    client.burn_from(&spender, &owner, &100i128);
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_unauthorized_admin_burn_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user, &500i128);
+    // clear all auths so the next call has no authorization
+    env.set_auths(&[]);
+    client.admin_burn(&user, &100i128);
 }

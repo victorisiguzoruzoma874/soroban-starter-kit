@@ -184,6 +184,74 @@ fn test_initialize_past_deadline() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_initialize_buyer_equals_seller_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let same = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&same, &same, &arbiter, &token, &1_000, &deadline);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_initialize_buyer_equals_arbiter_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let same = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&same, &seller, &same, &token, &1_000, &deadline);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_initialize_seller_equals_arbiter_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let same = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &same, &same, &token, &1_000, &deadline);
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_initialize_zero_amount_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &0, &deadline);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_initialize_negative_amount_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &-1, &deadline);
+}
+
+#[test]
 fn test_initialize_escrow() {
     let env = Env::default();
     env.mock_all_auths();
@@ -267,8 +335,19 @@ fn test_raise_dispute() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (client, ..) = setup_funded_escrow(&env);
-    client.raise_dispute();
+    let (client, _, buyer, ..) = setup_funded_escrow(&env);
+    client.raise_dispute(&buyer);
+
+    assert_eq!(client.get_state(), Some(EscrowState::Disputed));
+}
+
+#[test]
+fn test_seller_raises_dispute() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, seller, ..) = setup_funded_escrow(&env);
+    client.raise_dispute(&seller);
 
     assert_eq!(client.get_state(), Some(EscrowState::Disputed));
 }
@@ -278,8 +357,8 @@ fn test_resolve_dispute_to_seller() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (client, ..) = setup_funded_escrow(&env);
-    client.raise_dispute();
+    let (client, _, buyer, ..) = setup_funded_escrow(&env);
+    client.raise_dispute(&buyer);
     client.resolve_dispute(&true);
 
     assert_eq!(client.get_state(), Some(EscrowState::Completed));
@@ -290,8 +369,8 @@ fn test_resolve_dispute_to_buyer() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (client, ..) = setup_funded_escrow(&env);
-    client.raise_dispute();
+    let (client, _, buyer, ..) = setup_funded_escrow(&env);
+    client.raise_dispute(&buyer);
     client.resolve_dispute(&false);
 
     assert_eq!(client.get_state(), Some(EscrowState::Refunded));
@@ -325,7 +404,7 @@ fn test_arbiter_resolve_to_seller() {
     env.mock_all_auths();
 
     let (client, contract_address, buyer, seller, _, _, amount) = setup_funded_escrow(&env);
-    client.raise_dispute();
+    client.raise_dispute(&buyer);
     client.resolve_dispute(&true);
 
     assert_eq!(client.get_state(), Some(EscrowState::Completed));
@@ -337,8 +416,8 @@ fn test_arbiter_resolve_to_buyer() {
     let env = Env::default();
     env.mock_all_auths();
 
-    let (client, ..) = setup_funded_escrow(&env);
-    client.raise_dispute();
+    let (client, _, buyer, ..) = setup_funded_escrow(&env);
+    client.raise_dispute(&buyer);
     client.resolve_dispute(&false);
 
     assert_eq!(client.get_state(), Some(EscrowState::Refunded));
@@ -361,6 +440,47 @@ fn test_initialize_invalid_token_address() {
 
     let (client, _) = create_escrow_contract(&env);
     client.initialize(&buyer, &seller, &arbiter, &invalid_token, &amount, &deadline);
+}
+
+#[test]
+#[should_panic]
+fn test_cancel_by_seller_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, contract_address) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &amount, &deadline);
+
+    // Only authorize the seller — buyer.require_auth() inside cancel() will fail.
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    env.mock_auths(&[MockAuth {
+        address: &seller,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "cancel",
+            args: soroban_sdk::vec![&env].into(),
+            sub_invokes: &[],
+        },
+    }]);
+    client.cancel();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_cancel_after_funded_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // State is now Funded; cancel() requires Created state → InvalidState (#2).
+    client.cancel();
 }
 
 #[test]
@@ -415,6 +535,25 @@ fn test_bump_initialized_succeeds() {
     client.bump();
 }
 
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_fund_twice_fails() {
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_request_refund_before_deadline_fails() {
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_approve_delivery_without_mark_delivered_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // Already Funded; calling fund again must fail with InvalidState (#2)
+    client.fund();
+    // Deadline is sequence + 100; current sequence is 0 → deadline not reached → DeadlineNotReached (#4)
+    client.request_refund();
+    // Escrow is Funded; approve_delivery requires Delivered state → InvalidState (#2)
+    client.approve_delivery();
+}
 
 // ---------------------------------------------------------------------------
 // Feature-gated tests

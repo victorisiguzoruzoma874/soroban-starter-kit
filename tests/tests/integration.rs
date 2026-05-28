@@ -274,3 +274,39 @@ fn test_full_escrow_lifecycle_with_sac_token() {
         amount
     );
 }
+
+// ── #442: token allowance expiry flow ──────────────────────────────────────
+
+/// mint → approve with short expiry → advance ledger past expiry → transfer_from fails
+/// Verifies that expired allowances cannot be used and balances remain unchanged.
+#[test]
+fn test_token_allowance_expiry_in_integration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let token_admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let receiver = Address::generate(&env);
+    let amount = 1_000i128;
+    let expiry = env.ledger().sequence() + 10;
+
+    let (token, _) = deploy_token(&env, &token_admin);
+    token.mint(&owner, &amount);
+    assert_eq!(token.balance(&owner), amount);
+
+    // approve with short expiry
+    token.approve(&owner, &spender, &amount, &expiry);
+    assert_eq!(token.allowance(&owner, &spender), amount);
+
+    // advance ledger past expiry
+    env.ledger().with_mut(|l| l.sequence_number = expiry + 1);
+
+    // transfer_from should fail due to expired allowance
+    let result = token.try_transfer_from(&spender, &owner, &receiver, &amount);
+    assert!(result.is_err());
+
+    // verify balances unchanged
+    assert_eq!(token.balance(&owner), amount);
+    assert_eq!(token.balance(&receiver), 0);
+}

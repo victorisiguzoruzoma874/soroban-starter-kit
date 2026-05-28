@@ -15,6 +15,7 @@ fn setup(env: &Env) -> (TokenContractClient<'_>, Address) {
         &String::from_str(env, "Test Token"),
         &String::from_str(env, "TEST"),
         &18u32,
+        &None,
     );
     (client, admin)
 }
@@ -32,7 +33,7 @@ proptest! {
         prop_assert_eq!(client.balance(&user), amount);
         prop_assert_eq!(client.total_supply(), amount);
 
-        client.burn_admin(&user, &amount);
+        client.admin_burn(&user, &amount);
         prop_assert_eq!(client.balance(&user), 0);
         prop_assert_eq!(client.total_supply(), 0);
     }
@@ -98,5 +99,37 @@ proptest! {
             total += amount;
         }
         prop_assert_eq!(client.total_supply(), total);
+    }
+
+    /// Sequential mints never exceed max_supply cap.
+    #[test]
+    #[cfg(feature = "capped-supply")]
+    fn prop_total_supply_never_exceeds_cap(
+        amounts in proptest::collection::vec(1i128..=100_000i128, 1..=20),
+    ) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let addr = env.register_contract(None, TokenContract);
+        let client = TokenContractClient::new(&env, &addr);
+        let max_supply = 1_000_000i128;
+        client.initialize(
+            &admin,
+            &String::from_str(&env, "Capped Token"),
+            &String::from_str(&env, "CAP"),
+            &18u32,
+            &Some(max_supply),
+        );
+
+        let mut total = 0i128;
+        for amount in &amounts {
+            let user = Address::generate(&env);
+            let mint_amount = amount.min(max_supply.saturating_sub(total));
+            if mint_amount > 0 {
+                client.mint(&user, &mint_amount);
+                total += mint_amount;
+            }
+            prop_assert!(client.total_supply() <= max_supply);
+        }
     }
 }

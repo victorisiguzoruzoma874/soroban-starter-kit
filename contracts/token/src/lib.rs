@@ -243,6 +243,19 @@ impl TokenContract {
             .unwrap_or(0)
     }
 
+    /// Return `Some(balance)` if `id` has an entry in storage, or `None` if the
+    /// address has never held tokens.
+    ///
+    /// Unlike [`balance`] (which returns `0` for both unknown addresses and
+    /// addresses with a zero balance), `balance_of` lets callers distinguish
+    /// between "never seen this address" (`None`) and "address exists with a
+    /// zero balance" (`Some(0)`).
+    pub fn balance_of(env: Env, id: Address) -> Option<i128> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Balance(id))
+    }
+
     /// Return the git commit hash baked in at compile time.
     pub fn version(env: Env) -> String {
         String::from_str(&env, env!("GIT_HASH"))
@@ -408,9 +421,9 @@ impl token::TokenInterface for TokenContract {
             spender: spender.clone(),
         });
         let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-        let allowance = match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => v.amount,
-            _ => 0,
+        let (allowance, expiration_ledger) = match val {
+            Some(v) if env.ledger().sequence() <= v.expiration_ledger => (v.amount, v.expiration_ledger),
+            _ => (0, 0),
         };
         if allowance < amount {
             panic_with_error!(&env, TokenError::InsufficientAllowance);
@@ -419,7 +432,7 @@ impl token::TokenInterface for TokenContract {
             &key,
             &AllowanceValue {
                 amount: allowance - amount,
-                expiration_ledger: env.ledger().sequence() + LEDGER_BUMP_AMOUNT,
+                expiration_ledger,
             },
         );
         if let Err(e) = Self::transfer_impl(&env, from, to, amount) {
@@ -475,9 +488,9 @@ impl token::TokenInterface for TokenContract {
             spender: spender.clone(),
         });
         let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-        let allowance = match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => v.amount,
-            _ => 0,
+        let (allowance, expiration_ledger) = match val {
+            Some(v) if env.ledger().sequence() <= v.expiration_ledger => (v.amount, v.expiration_ledger),
+            _ => (0, 0),
         };
         if allowance < amount {
             panic_with_error!(&env, TokenError::InsufficientAllowance);
@@ -486,7 +499,7 @@ impl token::TokenInterface for TokenContract {
             &key,
             &AllowanceValue {
                 amount: allowance - amount,
-                expiration_ledger: env.ledger().sequence() + LEDGER_BUMP_AMOUNT,
+                expiration_ledger,
             },
         );
         let balance: i128 = env
