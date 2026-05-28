@@ -123,6 +123,20 @@ fn test_burn() {
 }
 
 #[test]
+fn test_admin_burn_decrements_total_supply() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&user, &1000i128);
+    assert_eq!(client.total_supply(), 1000i128);
+    client.try_admin_burn(&user, &400i128).unwrap();
+    assert_eq!(client.balance(&user), 600i128);
+    assert_eq!(client.total_supply(), 600i128);
+}
+
+#[test]
 fn test_transfer() {
     let env = Env::default();
     env.mock_all_auths();
