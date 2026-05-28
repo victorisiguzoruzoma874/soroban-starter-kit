@@ -130,6 +130,40 @@ rustup target add wasm32-unknown-unknown
 
 ---
 
+## Fuzz Testing
+
+Fuzz testing helps discover edge cases and potential vulnerabilities in contract code.
+
+### Running Fuzz Tests
+
+```bash
+# Install cargo-fuzz if not already installed
+cargo install cargo-fuzz
+
+# Run fuzz target for token contract
+cd fuzz
+cargo fuzz run token_fuzz
+
+# Run with a specific number of iterations
+cargo fuzz run token_fuzz -- -max_len=1024 -runs=10000
+
+# Run with a corpus directory
+cargo fuzz run token_fuzz -- corpus/
+```
+
+### Fuzz Targets
+
+- **token_fuzz**: Exercises token contract operations (mint, burn, transfer, approve, transfer_from, balance) with arbitrary inputs
+
+### Interpreting Results
+
+- Fuzz tests generate random inputs and monitor for crashes, panics, or undefined behavior
+- Crashes are saved to `fuzz/artifacts/` for reproduction
+- Use `RUST_BACKTRACE=1` for detailed crash information
+
+```bash
+RUST_BACKTRACE=1 cargo fuzz run token_fuzz -- fuzz/artifacts/token_fuzz/crash-*
+```
 ## Secrets Management
 
 ### Golden rules

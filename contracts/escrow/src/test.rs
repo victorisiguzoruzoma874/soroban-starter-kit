@@ -507,6 +507,34 @@ fn test_fund_insufficient_funds() {
     client.fund();
 }
 
+#[test]
+#[should_panic]
+fn test_get_escrow_info_uninitialized_panics() {
+    let env = Env::default();
+    let (client, _) = create_escrow_contract(&env);
+    // Calling get_escrow_info on uninitialized contract should panic
+    let _ = client.get_escrow_info();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_bump_uninitialized_fails() {
+    let env = Env::default();
+    let (client, _) = create_escrow_contract(&env);
+    // Calling bump on uninitialized contract should fail with NotInitialized (#6)
+    let _ = client.bump();
+}
+
+#[test]
+fn test_bump_initialized_succeeds() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // bump should succeed on initialized escrow
+    client.bump();
+}
+
 
 #[test]
 #[should_panic(expected = "Error(Contract, #2)")]

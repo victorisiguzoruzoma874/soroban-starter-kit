@@ -187,6 +187,56 @@ fn test_full_escrow_lifecycle_cancel_before_fund() {
     assert_eq!(token.balance(&buyer), amount);
 }
 
+/// initialize → fund → mark_delivered → approve_delivery with capped-supply token
+/// Verifies escrow works correctly when token has a supply cap.
+#[test]
+fn test_escrow_with_capped_token() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let token_admin = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let max_supply = 1_000i128;
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 200;
+
+    // Deploy token with max_supply set
+    let addr = env.register_contract(None, TokenContract);
+    let token = TokenContractClient::new(&env, &addr);
+    token.initialize(
+        &token_admin,
+        &String::from_str(&env, "Capped Token"),
+        &String::from_str(&env, "CAP"),
+        &18u32,
+        &Some(max_supply),
+    );
+    let token_addr = addr;
+
+    // Mint full supply to buyer
+    token.mint(&buyer, &max_supply);
+    assert_eq!(token.balance(&buyer), max_supply);
+
+    let (escrow, escrow_addr) = deploy_escrow(&env);
+    escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &amount, &deadline);
+
+    // fund: buyer's tokens move into the escrow contract
+    escrow.fund();
+    assert_eq!(token.balance(&buyer), 0);
+    assert_eq!(token.balance(&escrow_addr), amount);
+
+    // mark delivered by seller
+    escrow.mark_delivered();
+    assert_eq!(escrow.get_state(), Some(EscrowState::Delivered));
+
+    // buyer approves → tokens released to seller
+    escrow.approve_delivery();
+    assert_eq!(escrow.get_state(), Some(EscrowState::Completed));
+    assert_eq!(token.balance(&escrow_addr), 0);
+    assert_eq!(token.balance(&seller), amount);
+}
+
 // ── SAC-based token variant (mirrors original escrow tests) ──────────────────
 
 /// Same happy-path but using a Stellar Asset Contract token instead of the

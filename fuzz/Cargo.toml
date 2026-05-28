@@ -1,0 +1,21 @@
+[package]
+name = "soroban-token-fuzz"
+version = "0.1.0"
+edition = "2021"
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-token-template = { path = "../contracts/token" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "token_fuzz"
+path = "fuzz_targets/token_fuzz.rs"
+test = false
+doc = false
+
+[lints]
+workspace = true
