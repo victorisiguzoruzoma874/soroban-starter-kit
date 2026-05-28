@@ -15,6 +15,7 @@ fn setup(env: &Env) -> (TokenContractClient<'_>, Address) {
         &String::from_str(env, "Test Token"),
         &String::from_str(env, "TEST"),
         &18u32,
+        &None,
     );
     (client, admin)
 }
@@ -32,7 +33,7 @@ proptest! {
         prop_assert_eq!(client.balance(&user), amount);
         prop_assert_eq!(client.total_supply(), amount);
 
-        client.burn_admin(&user, &amount);
+        client.admin_burn(&user, &amount);
         prop_assert_eq!(client.balance(&user), 0);
         prop_assert_eq!(client.total_supply(), 0);
     }
