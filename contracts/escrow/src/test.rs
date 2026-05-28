@@ -388,6 +388,17 @@ fn test_fund_insufficient_funds() {
 }
 
 
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_resolve_dispute_wrong_state_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    // Escrow is Funded but never Disputed — resolve_dispute must reject with InvalidState (#2)
+    let (client, ..) = setup_funded_escrow(&env);
+    client.resolve_dispute(&true);
+}
+
 // ---------------------------------------------------------------------------
 // Feature-gated tests
 // ---------------------------------------------------------------------------
