@@ -2,6 +2,11 @@
 
 use soroban_sdk::{contracttype, Address, Env};
 
+/// Minimum number of ledgers the deadline must be ahead of the current ledger
+/// when initializing an escrow. Enforced by the contract; tests must respect
+/// this value to avoid generating deadlines the contract would reject.
+pub const MIN_DEADLINE_BUFFER: u32 = 10;
+
 /// Storage key for the contract administrator address.
 ///
 /// Used in instance storage to persist the admin [`Address`] across invocations.
