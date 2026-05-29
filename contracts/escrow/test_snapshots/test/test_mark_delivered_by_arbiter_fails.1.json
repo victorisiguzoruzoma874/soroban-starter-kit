@@ -640,7 +640,7 @@
                 "bytes": "0000000000000000000000000000000000000000000000000000000000000005"
               },
               {
-                "symbol": "fund"
+                "symbol": "mark_delivered"
               }
             ],
             "data": "void"
@@ -658,16 +658,23 @@
           "v0": {
             "topics": [
               {
-                "symbol": "fn_return"
+                "symbol": "error"
               },
               {
-                "symbol": "fund"
+                "error": {
+                  "auth": "invalid_action"
+                }
               }
             ],
             "data": {
-              "error": {
-                "contract": 2
-              }
+              "vec": [
+                {
+                  "string": "Unauthorized function call for address"
+                },
+                {
+                  "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFCT4"
+                }
+              ]
             }
           }
         }
@@ -687,12 +694,37 @@
               },
               {
                 "error": {
-                  "contract": 2
+                  "auth": "invalid_action"
                 }
               }
             ],
             "data": {
-              "string": "escalating Ok(ScErrorType::Contract) frame-exit to Err"
+              "string": "escalating error to panic"
+            }
+          }
+        }
+      },
+      "failed_call": true
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "0000000000000000000000000000000000000000000000000000000000000005",
+        "type_": "diagnostic",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "error"
+              },
+              {
+                "error": {
+                  "auth": "invalid_action"
+                }
+              }
+            ],
+            "data": {
+              "string": "caught error from function"
             }
           }
         }
@@ -712,7 +744,7 @@
               },
               {
                 "error": {
-                  "contract": 2
+                  "auth": "invalid_action"
                 }
               }
             ],
@@ -722,7 +754,7 @@
                   "string": "contract call failed"
                 },
                 {
-                  "symbol": "fund"
+                  "symbol": "mark_delivered"
                 },
                 {
                   "vec": []
@@ -747,7 +779,7 @@
               },
               {
                 "error": {
-                  "contract": 2
+                  "auth": "invalid_action"
                 }
               }
             ],

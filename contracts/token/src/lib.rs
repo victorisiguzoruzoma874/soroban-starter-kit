@@ -116,16 +116,7 @@ impl TokenContract {
                 }
             }
         }
-        let balance: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(to.clone()))
-            .unwrap_or(0);
-        let new_balance = balance.checked_add(amount).ok_or(TokenError::Overflow)?;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(to.clone()), &new_balance);
-        bump_persistent(&env, &DataKey::Balance(to.clone()));
+        Self::update_balance(&env, &to, amount)?;
         let supply: i128 = env
             .storage()
             .instance()
@@ -148,18 +139,7 @@ impl TokenContract {
         if amount <= 0 {
             return Err(TokenError::InvalidAmount);
         }
-        let balance: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(from.clone()))
-            .unwrap_or(0);
-        if balance < amount {
-            return Err(TokenError::InsufficientBalance);
-        }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(balance - amount));
-        bump_persistent(&env, &DataKey::Balance(from.clone()));
+        Self::update_balance(&env, &from, -amount)?;
         let supply: i128 = env
             .storage()
             .instance()
@@ -228,11 +208,11 @@ impl TokenContract {
     }
 
     /// Return the current admin address.
-    pub fn admin(env: Env) -> Address {
+    pub fn admin(env: Env) -> Result<Address, TokenError> {
         env.storage()
             .instance()
             .get(&DataKey::Admin)
-            .unwrap()
+            .ok_or(TokenError::NotInitialized)
     }
 
     /// Return the current total token supply.
@@ -449,18 +429,9 @@ impl token::TokenInterface for TokenContract {
         if amount <= 0 {
             panic_with_error!(&env, TokenError::InvalidAmount);
         }
-        let balance: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(from.clone()))
-            .unwrap_or(0);
-        if balance < amount {
-            panic_with_error!(&env, TokenError::InsufficientBalance);
+        if let Err(e) = Self::update_balance(&env, &from, -amount) {
+            panic_with_error!(&env, e);
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(balance - amount));
-        bump_persistent(&env, &DataKey::Balance(from.clone()));
         let supply: i128 = env
             .storage()
             .instance()
@@ -502,18 +473,9 @@ impl token::TokenInterface for TokenContract {
                 expiration_ledger,
             },
         );
-        let balance: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(from.clone()))
-            .unwrap_or(0);
-        if balance < amount {
-            panic_with_error!(&env, TokenError::InsufficientBalance);
+        if let Err(e) = Self::update_balance(&env, &from, -amount) {
+            panic_with_error!(&env, e);
         }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(balance - amount));
-        bump_persistent(&env, &DataKey::Balance(from.clone()));
         let supply: i128 = env
             .storage()
             .instance()
@@ -534,25 +496,44 @@ impl token::TokenInterface for TokenContract {
         env.storage()
             .instance()
             .get(&DataKey::Metadata(MetadataKey::Decimals))
-            .unwrap()
+            .unwrap_or_default()
     }
 
     fn name(env: Env) -> String {
         env.storage()
             .instance()
             .get(&DataKey::Metadata(MetadataKey::Name))
-            .unwrap()
+            .unwrap_or_else(|| String::from_str(&env, ""))
     }
 
     fn symbol(env: Env) -> String {
         env.storage()
             .instance()
             .get(&DataKey::Metadata(MetadataKey::Symbol))
-            .unwrap()
+            .unwrap_or_else(|| String::from_str(&env, ""))
     }
 }
 
 impl TokenContract {
+    /// Update a balance by a delta amount, handling storage read/write and TTL bump.
+    /// Returns error if the resulting balance would be negative or overflow.
+    fn update_balance(env: &Env, account: &Address, delta: i128) -> Result<(), TokenError> {
+        let balance: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Balance(account.clone()))
+            .unwrap_or(0);
+        let new_balance = balance.checked_add(delta).ok_or(TokenError::Overflow)?;
+        if new_balance < 0 {
+            return Err(TokenError::InsufficientBalance);
+        }
+        env.storage()
+            .persistent()
+            .set(&DataKey::Balance(account.clone()), &new_balance);
+        bump_persistent(env, &DataKey::Balance(account.clone()));
+        Ok(())
+    }
+
     /// Move `amount` tokens from `from` to `to`, updating persistent storage and emitting an event.
     ///
     /// # Preconditions (caller must ensure before calling)
@@ -576,27 +557,8 @@ impl TokenContract {
         if amount <= 0 {
             return Err(TokenError::InvalidAmount);
         }
-        let from_balance: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(from.clone()))
-            .unwrap_or(0);
-        if from_balance < amount {
-            return Err(TokenError::InsufficientBalance);
-        }
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(from.clone()), &(from_balance - amount));
-        bump_persistent(env, &DataKey::Balance(from.clone()));
-        let to_balance: i128 = env
-            .storage()
-            .persistent()
-            .get(&DataKey::Balance(to.clone()))
-            .unwrap_or(0);
-        env.storage()
-            .persistent()
-            .set(&DataKey::Balance(to.clone()), &(to_balance + amount));
-        bump_persistent(env, &DataKey::Balance(to.clone()));
+        Self::update_balance(env, &from, -amount)?;
+        Self::update_balance(env, &to, amount)?;
         events::transferred(env, &from, &to, amount);
         Ok(())
     }

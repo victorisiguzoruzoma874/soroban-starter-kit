@@ -770,7 +770,10 @@ fn test_burn_from_expired_allowance() {
     });
 
     client.burn_from(&spender, &owner, &100i128);
-#[should_panic(expected = "Error(Contract, #3)")]
+}
+
+#[test]
+#[should_panic(expected = "Error(Auth, InvalidAction)")]
 fn test_unauthorized_admin_burn_fails() {
     let env = Env::default();
     env.mock_all_auths();
