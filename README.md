@@ -123,12 +123,15 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 
 ## 📚 Resources
 
+- [System Architecture](docs/architecture.md) — High-level design, contract relationships, storage tiers, event model, and admin framework
+- [Security Best Practices](docs/security.md)
+- [Integration Guide](docs/integration-guide.md)
+- [Deployment Guide](docs/deployment-guide.md)
 - [Soroban Documentation](https://soroban.stellar.org/docs)
 - [Stellar Developer Discord](https://discord.gg/stellardev)
 - [Soroban Examples](https://github.com/stellar/soroban-examples)
 - [Freighter Wallet](https://freighter.app/)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
-- [Security Best Practices](docs/security.md)
 
 ## 📄 License
 
