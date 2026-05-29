@@ -11,6 +11,7 @@ pub use errors::EscrowError;
 pub use storage::{DataKey, EscrowInfo, EscrowState};
 
 use admin::require_admin;
+use soroban_common::MIN_DEADLINE_BUFFER;
 use storage::DataKey::*;
 
 /// Extend storage TTL when remaining ledgers fall below this threshold.
@@ -18,9 +19,6 @@ const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
 
 /// Target TTL (in ledgers) after each extension.
 const LEDGER_BUMP_AMOUNT: u32 = 518_400;
-
-/// Minimum number of ledgers the deadline must be in the future.
-const MIN_DEADLINE_BUFFER: u32 = 10;
 
 fn bump_instance(env: &Env) {
     env.storage()
@@ -76,8 +74,6 @@ impl EscrowContract {
         env.storage().instance().set(&Amount, &amount);
         env.storage().instance().set(&Deadline, &deadline_ledger);
         env.storage().instance().set(&State, &EscrowState::Created);
-        env.storage().instance().set(&BuyerApproved, &false);
-        env.storage().instance().set(&SellerDelivered, &false);
 
         bump_instance(&env);
 
@@ -147,7 +143,6 @@ impl EscrowContract {
             return Err(EscrowError::InvalidState);
         }
 
-        env.storage().instance().set(&SellerDelivered, &true);
         env.storage().instance().set(&State, &EscrowState::Delivered);
         bump_instance(&env);
 
@@ -170,6 +165,48 @@ impl EscrowContract {
         buyer.require_auth();
 
         Self::release_to_seller(env)
+    }
+
+    /// Buyer releases a partial amount to the seller (milestone-based payments).
+    /// Only callable in `Funded` state. Decrements the stored amount.
+    pub fn release_partial(env: Env, amount: i128) -> Result<(), EscrowError> {
+        #[cfg(feature = "pausable")]
+        Self::require_not_paused(&env)?;
+
+        let buyer: Address = env
+            .storage()
+            .instance()
+            .get(&Buyer)
+            .ok_or(EscrowError::NotInitialized)?;
+        buyer.require_auth();
+
+        let state: EscrowState = env
+            .storage()
+            .instance()
+            .get(&State)
+            .ok_or(EscrowError::NotInitialized)?;
+        if state != EscrowState::Funded {
+            return Err(EscrowError::InvalidState);
+        }
+
+        if amount <= 0 {
+            return Err(EscrowError::InvalidAmount);
+        }
+
+        let stored_amount: i128 = env.storage().instance().get(&Amount).unwrap();
+        if amount > stored_amount {
+            return Err(EscrowError::InsufficientFunds);
+        }
+
+        let seller: Address = env.storage().instance().get(&Seller).unwrap();
+        let new_amount = stored_amount - amount;
+        env.storage().instance().set(&Amount, &new_amount);
+        bump_instance(&env);
+
+        admin::transfer_token(&env, &env.current_contract_address(), &seller, amount);
+        events::partial_release(&env, &seller, amount);
+
+        Ok(())
     }
 
     /// Buyer requests a refund after the deadline has passed.

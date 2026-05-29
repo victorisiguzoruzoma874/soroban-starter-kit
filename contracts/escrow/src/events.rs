@@ -23,6 +23,10 @@ pub fn funds_released(env: &Env, seller: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "funds_released"), seller.clone()), amount);
 }
 
+pub fn partial_release(env: &Env, seller: &Address, amount: i128) {
+    env.events().publish((Symbol::new(env, "partial_release"), seller.clone()), amount);
+}
+
 pub fn funds_refunded(env: &Env, buyer: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "funds_refunded"), buyer.clone()), amount);
 }

@@ -9,7 +9,7 @@ use soroban_sdk::{
 
 use crate::{EscrowContract, EscrowContractClient, EscrowState};
 
-const MIN_DEADLINE_BUFFER: u32 = 100;
+use soroban_common::MIN_DEADLINE_BUFFER;
 
 fn setup_escrow<'a>(
     env: &'a Env,

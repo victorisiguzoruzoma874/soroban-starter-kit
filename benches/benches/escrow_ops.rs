@@ -150,11 +150,40 @@ fn bench_resolve_dispute(c: &mut Criterion) {
     });
 }
 
+fn bench_full_lifecycle(c: &mut Criterion) {
+    c.bench_function("escrow::full_lifecycle", |b| {
+        b.iter(|| {
+            let env = Env::default();
+            env.mock_all_auths();
+
+            let token_admin = Address::generate(&env);
+            let buyer = Address::generate(&env);
+            let seller = Address::generate(&env);
+            let arbiter = Address::generate(&env);
+            let deadline = env.ledger().sequence() + 500;
+
+            let sac = env.register_stellar_asset_contract_v2(token_admin);
+            let token_addr = sac.address();
+            StellarAssetClient::new(&env, &token_addr).mint(&buyer, &1_000i128);
+
+            let escrow_addr = env.register_contract(None, EscrowContract);
+            let escrow = EscrowContractClient::new(&env, &escrow_addr);
+            escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &1_000i128, &deadline);
+            
+            // Full lifecycle: fund → mark_delivered → approve_delivery
+            escrow.fund();
+            escrow.mark_delivered();
+            escrow.approve_delivery();
+        });
+    });
+}
+
 criterion_group!(
     benches,
     bench_initialize,
     bench_fund,
     bench_approve_delivery,
     bench_resolve_dispute,
+    bench_full_lifecycle,
 );
 criterion_main!(benches);
