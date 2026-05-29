@@ -129,6 +129,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 - [Freighter Wallet](https://freighter.app/)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [Security Best Practices](docs/security.md)
+ - [Architecture Decision Records](docs/adr/README.md)
 
 ## 📄 License
 
