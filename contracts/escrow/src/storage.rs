@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, Vec};
 
 /// Top-level storage keys used by [`EscrowContract`](crate::EscrowContract).
 ///
@@ -26,6 +26,12 @@ pub enum DataKey {
     Version,
     /// Pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
     PendingUpgrade,
+    /// Multiple arbiters for multi-sig support (`Vec<Address>`).
+    Arbiters,
+    /// Number of required signatures for multi-sig resolution (`u32`).
+    RequiredSignatures,
+    /// Arbiter votes for dispute resolution (`Vec<Address>`).
+    ArbiterVotes,
 }
 
 /// Lifecycle states of an escrow.

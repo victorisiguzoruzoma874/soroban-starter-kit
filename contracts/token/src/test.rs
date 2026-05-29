@@ -773,6 +773,7 @@ fn test_burn_from_expired_allowance() {
 }
 
 #[test]
+#[should_panic(expected = "InvalidAction")]
 #[should_panic(expected = "Error(Auth, InvalidAction)")]
 fn test_unauthorized_admin_burn_fails() {
     let env = Env::default();
@@ -786,6 +787,82 @@ fn test_unauthorized_admin_burn_fails() {
     client.admin_burn(&user, &100i128);
 }
 
+#[test]
+fn test_batch_mint() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let user3 = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    let recipients = soroban_sdk::vec![
+        &env,
+        (user1.clone(), 100i128),
+        (user2.clone(), 200i128),
+        (user3.clone(), 300i128),
+    ];
+    client.batch_mint(&recipients);
+
+    assert_eq!(client.balance(&user1), 100i128);
+    assert_eq!(client.balance(&user2), 200i128);
+    assert_eq!(client.balance(&user3), 300i128);
+    assert_eq!(client.total_supply(), 600i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #6)")]
+fn test_batch_mint_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let user1 = Address::generate(&env);
+    let user2 = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    let recipients = soroban_sdk::vec![
+        &env,
+        (user1.clone(), 100i128),
+        (user2.clone(), 0i128),
+    ];
+    client.batch_mint(&recipients);
+}
+
+#[test]
+fn test_allowance_expiry() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+    client.mint(&owner, &1000i128);
+
+    let expiration = env.ledger().sequence() + 100;
+    client.approve(&owner, &spender, &500i128, &expiration);
+
+    // Check that allowance_expiry returns the correct expiration
+    assert_eq!(client.allowance_expiry(&owner, &spender), Some(expiration));
+
+    // Advance ledger past expiration
+    env.ledger().with_mut(|l| l.sequence_number = expiration + 1);
+
+    // Check that allowance_expiry returns None after expiration
+    assert_eq!(client.allowance_expiry(&owner, &spender), None);
+}
+
+#[test]
+fn test_allowance_expiry_no_allowance() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let owner = Address::generate(&env);
+    let spender = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    // Check that allowance_expiry returns None when no allowance exists
+    assert_eq!(client.allowance_expiry(&owner, &spender), None);
 
 #[test]
 fn test_propose_admin() {

@@ -832,3 +832,71 @@ mod upgradeable_tests {
         assert!(found, "upgraded event not emitted");
     }
 }
+
+// Tests for new features
+#[test]
+fn test_update_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+
+    client.initialize(&buyer, &seller, &arbiter, &token, &1_000, &deadline);
+    
+    // Update amount before funding
+    client.update_amount(&2_000);
+    
+    let info = client.get_escrow_info();
+    assert_eq!(info.amount, 2_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_update_amount_zero_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+
+    client.initialize(&buyer, &seller, &arbiter, &token, &1_000, &deadline);
+    client.update_amount(&0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_update_amount_after_funding_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, ..) = setup_funded_escrow(&env);
+    
+    // Try to update amount after funding
+    client.update_amount(&2_000);
+}
+
+#[test]
+fn test_initialize_with_arbiters() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter1 = Address::generate(&env);
+    let arbiter2 = Address::generate(&env);
+    let arbiter3 = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+
+    let arbiters = soroban_sdk::vec![&env, arbiter1.clone(), arbiter2.clone(), arbiter3.clone()];
+    client.initialize_with_arbiters(&buyer, &seller, &arbiters, &token, &1_000, &deadline, &2);
+    
+    let info = client.get_escrow_info();
+    assert_eq!(info.amount, 1_000);
+}

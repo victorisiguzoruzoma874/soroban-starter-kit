@@ -153,6 +153,76 @@ impl TokenContract {
         Ok(())
     }
 
+    /// Mint tokens to multiple recipients in a single transaction. Admin only.
+    ///
+    /// Validates all amounts > 0 before any state changes. Respects `capped-supply` cap
+    /// across the entire batch. Emits individual `mint` events per recipient.
+    pub fn batch_mint(
+        env: Env,
+        recipients: soroban_sdk::Vec<(Address, i128)>,
+    ) -> Result<(), TokenError> {
+        #[cfg(feature = "pausable")]
+        require_not_paused(&env)?;
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+
+        // Validate all amounts > 0 before any state changes
+        let mut total_amount: i128 = 0;
+        for (_, amount) in recipients.iter() {
+            if amount <= 0 {
+                return Err(TokenError::InvalidAmount);
+            }
+            total_amount = total_amount.checked_add(amount).ok_or(TokenError::Overflow)?;
+        }
+
+        // Check capped-supply cap
+        #[cfg(feature = "capped-supply")]
+        {
+            let supply: i128 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalSupply)
+                .unwrap_or(0);
+            if let Some(cap) = env
+                .storage()
+                .instance()
+                .get::<DataKey, i128>(&DataKey::MaxSupply)
+            {
+                if supply.checked_add(total_amount).ok_or(TokenError::Overflow)? > cap {
+                    return Err(TokenError::InvalidAmount);
+                }
+            }
+        }
+
+        // Mint to each recipient
+        for (to, amount) in recipients.iter() {
+            let balance: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Balance(to.clone()))
+                .unwrap_or(0);
+            let new_balance = balance.checked_add(amount).ok_or(TokenError::Overflow)?;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Balance(to.clone()), &new_balance);
+            bump_persistent(&env, &DataKey::Balance(to.clone()));
+            events::minted(&env, &to, amount);
+        }
+
+        // Update total supply once
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(supply + total_amount));
+        bump_instance(&env);
+
+        Ok(())
+    }
+
     /// Burn `amount` tokens from `from`. Admin only.
     pub fn admin_burn(env: Env, from: Address, amount: i128) -> Result<(), TokenError> {
         #[cfg(feature = "pausable")]
@@ -405,6 +475,22 @@ impl TokenContract {
     /// Return the configured maximum supply cap, or `None` if uncapped.
     pub fn max_supply(env: Env) -> Option<i128> {
         env.storage().instance().get(&DataKey::MaxSupply)
+    }
+}
+
+#[contractimpl]
+impl TokenContract {
+    /// Return the expiration ledger for an allowance, or `None` if no allowance exists.
+    pub fn allowance_expiry(env: Env, from: Address, spender: Address) -> Option<u32> {
+        let key = DataKey::Allowance(AllowanceDataKey {
+            from: from.clone(),
+            spender: spender.clone(),
+        });
+        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
+        match val {
+            Some(v) if env.ledger().sequence() <= v.expiration_ledger => Some(v.expiration_ledger),
+            _ => None,
+        }
     }
 }
 

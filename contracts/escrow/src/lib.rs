@@ -74,11 +74,107 @@ impl EscrowContract {
         env.storage().instance().set(&Amount, &amount);
         env.storage().instance().set(&Deadline, &deadline_ledger);
         env.storage().instance().set(&State, &EscrowState::Created);
+        env.storage().instance().set(&BuyerApproved, &false);
+        env.storage().instance().set(&SellerDelivered, &false);
+        // Default to single-sig (1-of-1)
+        env.storage().instance().set(&RequiredSignatures, &1u32);
 
         bump_instance(&env);
 
         events::escrow_created(&env, &buyer, &seller, amount);
         events::initialized(&env, &buyer, &seller, &arbiter, amount);
+
+        Ok(())
+    }
+
+    /// Initialize a new escrow with multi-sig arbiter support. Must be called exactly once.
+    ///
+    /// Allows specifying multiple arbiters and requiring N-of-M signatures for resolution.
+    pub fn initialize_with_arbiters(
+        env: Env,
+        buyer: Address,
+        seller: Address,
+        arbiters: soroban_sdk::Vec<Address>,
+        token_contract: Address,
+        amount: i128,
+        deadline_ledger: u32,
+        required_signatures: u32,
+    ) -> Result<(), EscrowError> {
+        if env.storage().instance().has(&State) {
+            return Err(EscrowError::AlreadyInitialized);
+        }
+        if amount <= 0 {
+            return Err(EscrowError::InvalidAmount);
+        }
+        if arbiters.is_empty() || required_signatures == 0 || required_signatures > arbiters.len() as u32 {
+            return Err(EscrowError::InvalidParties);
+        }
+
+        // Validate no duplicates and no conflicts with buyer/seller
+        for arbiter in arbiters.iter() {
+            if arbiter == buyer || arbiter == seller {
+                return Err(EscrowError::InvalidParties);
+            }
+        }
+
+        if deadline_ledger < env.ledger().sequence() + MIN_DEADLINE_BUFFER {
+            return Err(EscrowError::DeadlinePassed);
+        }
+
+        // Validate that token_contract is a real token by calling decimals().
+        let token_client = token::Client::new(&env, &token_contract);
+        token_client.decimals();
+
+        env.storage().instance().set(&Buyer, &buyer);
+        env.storage().instance().set(&Seller, &seller);
+        env.storage().instance().set(&Arbiters, &arbiters);
+        env.storage().instance().set(&Arbiter, &arbiters.get(0).unwrap());
+        env.storage().instance().set(&RequiredSignatures, &required_signatures);
+        env.storage().instance().set(&TokenContract, &token_contract);
+        env.storage().instance().set(&Amount, &amount);
+        env.storage().instance().set(&Deadline, &deadline_ledger);
+        env.storage().instance().set(&State, &EscrowState::Created);
+        env.storage().instance().set(&BuyerApproved, &false);
+        env.storage().instance().set(&SellerDelivered, &false);
+
+        bump_instance(&env);
+
+        events::escrow_created(&env, &buyer, &seller, amount);
+        events::initialized(&env, &buyer, &seller, &arbiters.get(0).unwrap(), amount);
+
+        Ok(())
+    }
+
+    /// Update the escrow amount. Buyer only, `Created` state only.
+    ///
+    /// Allows the buyer to adjust the amount before funding. Validates `new_amount > 0`.
+    /// Emits an `amount_updated` event.
+    pub fn update_amount(env: Env, new_amount: i128) -> Result<(), EscrowError> {
+        let buyer: Address = env
+            .storage()
+            .instance()
+            .get(&Buyer)
+            .ok_or(EscrowError::NotInitialized)?;
+        buyer.require_auth();
+
+        if new_amount <= 0 {
+            return Err(EscrowError::InvalidAmount);
+        }
+
+        let state: EscrowState = env
+            .storage()
+            .instance()
+            .get(&State)
+            .ok_or(EscrowError::NotInitialized)?;
+        if state != EscrowState::Created {
+            return Err(EscrowError::InvalidState);
+        }
+
+        env.storage().instance().set(&Amount, &new_amount);
+        bump_instance(&env);
+
+        env.events()
+            .publish((Symbol::new(&env, "amount_updated"), buyer), new_amount);
 
         Ok(())
     }
@@ -282,13 +378,6 @@ impl EscrowContract {
 
     /// Arbiter resolves a dispute.
     pub fn resolve_dispute(env: Env, release_to_seller: bool) -> Result<(), EscrowError> {
-        let arbiter: Address = env
-            .storage()
-            .instance()
-            .get(&Arbiter)
-            .ok_or(EscrowError::NotInitialized)?;
-        arbiter.require_auth();
-
         let state: EscrowState = env
             .storage()
             .instance()
@@ -298,12 +387,79 @@ impl EscrowContract {
             return Err(EscrowError::InvalidState);
         }
 
-        if release_to_seller {
-            env.storage().instance().set(&State, &EscrowState::Delivered);
-            Self::release_to_seller(env)
+        // Check if using multi-sig arbiters
+        let arbiters_opt: Option<soroban_sdk::Vec<Address>> = env.storage().instance().get(&DataKey::Arbiters);
+        
+        if let Some(arbiters) = arbiters_opt {
+            // Multi-sig mode
+            let required_sigs: u32 = env
+                .storage()
+                .instance()
+                .get(&DataKey::RequiredSignatures)
+                .unwrap_or(1);
+            
+            let mut votes: soroban_sdk::Vec<Address> = env
+                .storage()
+                .instance()
+                .get(&DataKey::ArbiterVotes)
+                .unwrap_or_else(|| soroban_sdk::Vec::new(&env));
+            
+            // Find the first arbiter that authorizes and add to votes
+            let mut caller_found = false;
+            for arbiter in arbiters.iter() {
+                arbiter.require_auth();
+                
+                // Add this arbiter to votes if not already there
+                let mut already_voted = false;
+                for vote in votes.iter() {
+                    if vote == arbiter {
+                        already_voted = true;
+                        break;
+                    }
+                }
+                
+                if !already_voted {
+                    votes.push_back(arbiter.clone());
+                }
+                caller_found = true;
+                break;
+            }
+            
+            if !caller_found {
+                return Err(EscrowError::NotAuthorized);
+            }
+            
+            env.storage().instance().set(&DataKey::ArbiterVotes, &votes);
+            
+            // Check if we have enough signatures
+            if votes.len() as u32 >= required_sigs {
+                env.storage().instance().remove(&DataKey::ArbiterVotes);
+                if release_to_seller {
+                    env.storage().instance().set(&State, &EscrowState::Delivered);
+                    Self::release_to_seller(env)
+                } else {
+                    env.storage().instance().set(&State, &EscrowState::Funded);
+                    Self::refund_to_buyer(env)
+                }
+            } else {
+                Ok(())
+            }
         } else {
-            env.storage().instance().set(&State, &EscrowState::Funded);
-            Self::refund_to_buyer(env)
+            // Single arbiter mode (backward compatible)
+            let arbiter: Address = env
+                .storage()
+                .instance()
+                .get(&Arbiter)
+                .ok_or(EscrowError::NotInitialized)?;
+            arbiter.require_auth();
+
+            if release_to_seller {
+                env.storage().instance().set(&State, &EscrowState::Delivered);
+                Self::release_to_seller(env)
+            } else {
+                env.storage().instance().set(&State, &EscrowState::Funded);
+                Self::refund_to_buyer(env)
+            }
         }
     }
 
