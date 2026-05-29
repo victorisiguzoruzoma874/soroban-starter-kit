@@ -24,7 +24,7 @@ pub enum DataKey {
     Paused,
     /// Contract version number (`u32`).
     Version,
-    /// Pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
+    /// Pending WASM upgrade: `(BytesN<32>, u32)` = (hash, `ready_after_ledger`).
     PendingUpgrade,
     /// Multiple arbiters for multi-sig support (`Vec<Address>`).
     Arbiters,
@@ -91,7 +91,7 @@ mod tests {
 /// Snapshot of all escrow fields returned by
 /// [`EscrowContract::get_escrow_info`](crate::EscrowContract::get_escrow_info).
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EscrowInfo {
     /// Buyer address.
     pub buyer: Address,

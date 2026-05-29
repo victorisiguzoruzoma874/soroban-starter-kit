@@ -33,6 +33,7 @@ pub enum AdminKey {
 /// ```ignore
 /// let admin: Address = soroban_common::get_admin(&env);
 /// ```
+#[must_use]
 pub fn get_admin(env: &Env) -> Address {
     env.storage()
         .instance()
@@ -49,6 +50,7 @@ pub fn get_admin(env: &Env) -> Address {
 ///     // admin is set
 /// }
 /// ```
+#[must_use]
 pub fn try_get_admin(env: &Env) -> Option<Address> {
     env.storage().instance().get(&AdminKey::Admin)
 }
