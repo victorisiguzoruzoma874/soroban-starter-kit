@@ -45,6 +45,19 @@ fn require_not_paused(env: &Env) -> Result<(), TokenError> {
     Ok(())
 }
 
+#[cfg(feature = "freeze")]
+fn require_not_frozen(env: &Env, account: &Address) -> Result<(), TokenError> {
+    if env
+        .storage()
+        .instance()
+        .get(&DataKey::Frozen(account.clone()))
+        .unwrap_or(false)
+    {
+        return Err(TokenError::Unauthorized);
+    }
+    Ok(())
+}
+
 #[contract]
 pub struct TokenContract;
 
@@ -76,6 +89,7 @@ impl TokenContract {
             .instance()
             .set(&DataKey::Metadata(MetadataKey::Decimals), &decimals);
         env.storage().instance().set(&DataKey::TotalSupply, &0i128);
+        env.storage().instance().set(&DataKey::Version, &1u32);
         #[cfg(feature = "capped-supply")]
         if let Some(cap) = max_supply {
             if cap <= 0 {
@@ -130,6 +144,76 @@ impl TokenContract {
         Ok(())
     }
 
+    /// Mint tokens to multiple recipients in a single transaction. Admin only.
+    ///
+    /// Validates all amounts > 0 before any state changes. Respects `capped-supply` cap
+    /// across the entire batch. Emits individual `mint` events per recipient.
+    pub fn batch_mint(
+        env: Env,
+        recipients: soroban_sdk::Vec<(Address, i128)>,
+    ) -> Result<(), TokenError> {
+        #[cfg(feature = "pausable")]
+        require_not_paused(&env)?;
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+
+        // Validate all amounts > 0 before any state changes
+        let mut total_amount: i128 = 0;
+        for (_, amount) in recipients.iter() {
+            if amount <= 0 {
+                return Err(TokenError::InvalidAmount);
+            }
+            total_amount = total_amount.checked_add(amount).ok_or(TokenError::Overflow)?;
+        }
+
+        // Check capped-supply cap
+        #[cfg(feature = "capped-supply")]
+        {
+            let supply: i128 = env
+                .storage()
+                .instance()
+                .get(&DataKey::TotalSupply)
+                .unwrap_or(0);
+            if let Some(cap) = env
+                .storage()
+                .instance()
+                .get::<DataKey, i128>(&DataKey::MaxSupply)
+            {
+                if supply.checked_add(total_amount).ok_or(TokenError::Overflow)? > cap {
+                    return Err(TokenError::InvalidAmount);
+                }
+            }
+        }
+
+        // Mint to each recipient
+        for (to, amount) in recipients.iter() {
+            let balance: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Balance(to.clone()))
+                .unwrap_or(0);
+            let new_balance = balance.checked_add(amount).ok_or(TokenError::Overflow)?;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Balance(to.clone()), &new_balance);
+            bump_persistent(&env, &DataKey::Balance(to.clone()));
+            events::minted(&env, &to, amount);
+        }
+
+        // Update total supply once
+        let supply: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalSupply)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalSupply, &(supply + total_amount));
+        bump_instance(&env);
+
+        Ok(())
+    }
+
     /// Burn `amount` tokens from `from`. Admin only.
     pub fn admin_burn(env: Env, from: Address, amount: i128) -> Result<(), TokenError> {
         #[cfg(feature = "pausable")]
@@ -163,10 +247,7 @@ impl TokenContract {
         admin.require_auth();
         env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
         bump_instance(&env);
-        env.events().publish(
-            (soroban_sdk::Symbol::new(&env, "admin_proposed"), admin),
-            new_admin,
-        );
+        events::admin_proposed(&env, &admin, &new_admin);
         Ok(())
     }
 
@@ -182,16 +263,17 @@ impl TokenContract {
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
         bump_instance(&env);
-        events::admin_changed(&env, &old_admin, &pending);
+        events::admin_accepted(&env, &pending);
         Ok(())
     }
 
     /// Cancel a pending admin transfer. Current admin only.
-    pub fn cancel_admin_transfer(env: Env) -> Result<(), TokenError> {
+    pub fn cancel_admin_proposal(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().remove(&DataKey::PendingAdmin);
         bump_instance(&env);
+        events::admin_proposal_cancelled(&env, &admin);
         Ok(())
     }
 
@@ -240,6 +322,14 @@ impl TokenContract {
     pub fn version(env: Env) -> String {
         String::from_str(&env, env!("GIT_HASH"))
     }
+
+    /// Return the on-chain contract version number.
+    pub fn contract_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::Version)
+            .unwrap_or(0)
+    }
 }
 
 /// Pause / unpause — only compiled when the `pausable` feature is enabled.
@@ -263,6 +353,37 @@ impl TokenContract {
         env.storage().instance().set(&DataKey::Paused, &false);
         bump_instance(&env);
         events::unpaused(&env, &admin);
+        Ok(())
+    }
+}
+
+/// Account freeze — only compiled when the `freeze` feature is enabled.
+#[cfg(feature = "freeze")]
+#[contractimpl]
+impl TokenContract {
+    /// Freeze an account, preventing transfers and burns. Admin only.
+    pub fn freeze_account(env: Env, account: Address) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Frozen(account.clone()), &true);
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "account_frozen"), account),
+            (),
+        );
+        Ok(())
+    }
+
+    /// Unfreeze an account, allowing transfers and burns. Admin only.
+    pub fn unfreeze_account(env: Env, account: Address) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Frozen(account.clone()), &false);
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "account_unfrozen"), account),
+            (),
+        );
         Ok(())
     }
 }
@@ -299,8 +420,6 @@ impl TokenContract {
     pub fn execute_upgrade(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
-        events::upgraded(&env, &admin, &new_wasm_hash);
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
         let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
             .storage()
             .instance()
@@ -310,6 +429,16 @@ impl TokenContract {
             return Err(TokenError::Unauthorized);
         }
         env.storage().instance().remove(&DataKey::PendingUpgrade);
+        let current_version: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Version)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::Version, &(current_version + 1));
+        bump_instance(&env);
+        events::upgraded(&env, &admin, &wasm_hash);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "upgrade_executed"), admin),
             wasm_hash.clone(),
@@ -326,6 +455,22 @@ impl TokenContract {
     /// Return the configured maximum supply cap, or `None` if uncapped.
     pub fn max_supply(env: Env) -> Option<i128> {
         env.storage().instance().get(&DataKey::MaxSupply)
+    }
+}
+
+#[contractimpl]
+impl TokenContract {
+    /// Return the expiration ledger for an allowance, or `None` if no allowance exists.
+    pub fn allowance_expiry(env: Env, from: Address, spender: Address) -> Option<u32> {
+        let key = DataKey::Allowance(AllowanceDataKey {
+            from: from.clone(),
+            spender: spender.clone(),
+        });
+        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
+        match val {
+            Some(v) if env.ledger().sequence() <= v.expiration_ledger => Some(v.expiration_ledger),
+            _ => None,
+        }
     }
 }
 
@@ -385,6 +530,10 @@ impl token::TokenInterface for TokenContract {
         if let Err(e) = require_not_paused(&env) {
             panic_with_error!(&env, e);
         }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
+            panic_with_error!(&env, e);
+        }
         if let Err(e) = Self::transfer_impl(&env, from, to, amount) {
             panic_with_error!(&env, e);
         }
@@ -394,6 +543,10 @@ impl token::TokenInterface for TokenContract {
         spender.require_auth();
         #[cfg(feature = "pausable")]
         if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
             panic_with_error!(&env, e);
         }
         let key = DataKey::Allowance(AllowanceDataKey {
@@ -426,6 +579,10 @@ impl token::TokenInterface for TokenContract {
         if let Err(e) = require_not_paused(&env) {
             panic_with_error!(&env, e);
         }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
+            panic_with_error!(&env, e);
+        }
         if amount <= 0 {
             panic_with_error!(&env, TokenError::InvalidAmount);
         }
@@ -452,6 +609,10 @@ impl token::TokenInterface for TokenContract {
         spender.require_auth();
         #[cfg(feature = "pausable")]
         if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
             panic_with_error!(&env, e);
         }
         let key = DataKey::Allowance(AllowanceDataKey {

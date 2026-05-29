@@ -562,7 +562,6 @@ fn test_bump_initialized_succeeds() {
     client.bump();
 }
 
-
 #[test]
 #[should_panic(expected = "Error(Contract, #2)")]
 fn test_fund_twice_fails() {
@@ -594,10 +593,138 @@ fn test_approve_delivery_without_mark_delivered_fails() {
     let (client, ..) = setup_funded_escrow(&env);
     // Already Funded; calling fund again must fail with InvalidState (#2)
     client.fund();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_request_refund_before_deadline_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
     // Deadline is sequence + 100; current sequence is 0 → deadline not reached → DeadlineNotReached (#4)
     client.request_refund();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_approve_delivery_without_mark_delivered_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
     // Escrow is Funded; approve_delivery requires Delivered state → InvalidState (#2)
     client.approve_delivery();
+}
+
+#[test]
+#[should_panic]
+fn test_approve_delivery_by_seller_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, seller, ..) = setup_funded_escrow(&env);
+    client.mark_delivered();
+    
+    // Clear auths and only authorize seller — approve_delivery requires buyer auth
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let contract_address = env.register_contract(None, EscrowContract);
+    env.mock_auths(&[MockAuth {
+        address: &seller,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "approve_delivery",
+            args: soroban_sdk::vec![&env].into(),
+            sub_invokes: &[],
+        },
+    }]);
+    client.approve_delivery();
+}
+
+#[test]
+#[should_panic]
+fn test_approve_delivery_by_arbiter_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, arbiter, ..) = setup_funded_escrow(&env);
+    client.mark_delivered();
+    
+    // Clear auths and only authorize arbiter — approve_delivery requires buyer auth
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let contract_address = env.register_contract(None, EscrowContract);
+    env.mock_auths(&[MockAuth {
+        address: &arbiter,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "approve_delivery",
+            args: soroban_sdk::vec![&env].into(),
+            sub_invokes: &[],
+        },
+    }]);
+    client.approve_delivery();
+}
+
+#[test]
+fn test_release_partial() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, _arbiter, _token, amount) = setup_funded_escrow(&env);
+    let partial = amount / 2;
+    
+    client.release_partial(&partial);
+    
+    // Verify state is still Funded
+    assert_eq!(client.get_state(), Some(EscrowState::Funded));
+    
+    // Verify amount was decremented
+    let info = client.get_escrow_info();
+    assert_eq!(info.amount, amount - partial);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_release_partial_invalid_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &amount, &deadline);
+    
+    // Try to release_partial in Created state — should fail with InvalidState
+    client.release_partial(&500i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_release_partial_exceeds_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, _arbiter, _token, amount) = setup_funded_escrow(&env);
+    
+    // Try to release more than available — should fail with InsufficientFunds
+    client.release_partial(&(amount + 1));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_release_partial_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, _arbiter, _token, _amount) = setup_funded_escrow(&env);
+    
+    // Try to release zero amount — should fail with InvalidAmount
+    client.release_partial(&0i128);
 }
 
 // ---------------------------------------------------------------------------
@@ -726,4 +853,72 @@ mod upgradeable_tests {
         });
         assert!(found, "upgraded event not emitted");
     }
+}
+
+// Tests for new features
+#[test]
+fn test_update_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+
+    client.initialize(&buyer, &seller, &arbiter, &token, &1_000, &deadline);
+    
+    // Update amount before funding
+    client.update_amount(&2_000);
+    
+    let info = client.get_escrow_info();
+    assert_eq!(info.amount, 2_000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_update_amount_zero_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+
+    client.initialize(&buyer, &seller, &arbiter, &token, &1_000, &deadline);
+    client.update_amount(&0);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_update_amount_after_funding_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, ..) = setup_funded_escrow(&env);
+    
+    // Try to update amount after funding
+    client.update_amount(&2_000);
+}
+
+#[test]
+fn test_initialize_with_arbiters() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter1 = Address::generate(&env);
+    let arbiter2 = Address::generate(&env);
+    let arbiter3 = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let deadline = env.ledger().sequence() + 100;
+    let (client, _) = create_escrow_contract(&env);
+
+    let arbiters = soroban_sdk::vec![&env, arbiter1.clone(), arbiter2.clone(), arbiter3.clone()];
+    client.initialize_with_arbiters(&buyer, &seller, &arbiters, &token, &1_000, &deadline, &2);
+    
+    let info = client.get_escrow_info();
+    assert_eq!(info.amount, 1_000);
 }
