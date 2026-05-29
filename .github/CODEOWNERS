@@ -1,0 +1,5 @@
+# CODEOWNERS
+
+/contracts/ @Fidelis900
+/.github/ @Fidelis900
+/docs/ @Fidelis900
