@@ -302,6 +302,7 @@ impl EscrowContract {
     }
 
     /// Return full escrow details as an [`EscrowInfo`] struct.
+    #[must_use]
     pub fn get_escrow_info(env: Env) -> EscrowInfo {
         EscrowInfo {
             buyer: env.storage().instance().get(&Buyer).unwrap(),
@@ -315,11 +316,13 @@ impl EscrowContract {
     }
 
     /// Return the current [`EscrowState`], or `None` if not initialized.
+    #[must_use]
     pub fn get_state(env: Env) -> Option<EscrowState> {
         env.storage().instance().get(&State)
     }
 
     /// Return `true` if the deadline ledger has been passed.
+    #[must_use]
     pub fn is_deadline_passed(env: Env) -> bool {
         let deadline: u32 = env.storage().instance().get(&Deadline).unwrap_or(0);
         env.ledger().sequence() > deadline

@@ -225,6 +225,7 @@ impl TokenContract {
     }
 
     /// Return the current admin address.
+    #[must_use]
     pub fn admin(env: Env) -> Address {
         env.storage()
             .instance()
@@ -233,6 +234,7 @@ impl TokenContract {
     }
 
     /// Return the current total token supply.
+    #[must_use]
     pub fn total_supply(env: Env) -> i128 {
         env.storage()
             .instance()
@@ -247,6 +249,7 @@ impl TokenContract {
     /// addresses with a zero balance), `balance_of` lets callers distinguish
     /// between "never seen this address" (`None`) and "address exists with a
     /// zero balance" (`Some(0)`).
+    #[must_use]
     pub fn balance_of(env: Env, id: Address) -> Option<i128> {
         env.storage()
             .persistent()
@@ -254,6 +257,7 @@ impl TokenContract {
     }
 
     /// Return the git commit hash baked in at compile time.
+    #[must_use]
     pub fn version(env: Env) -> String {
         String::from_str(&env, env!("GIT_HASH"))
     }
@@ -341,6 +345,7 @@ impl TokenContract {
 #[contractimpl]
 impl TokenContract {
     /// Return the configured maximum supply cap, or `None` if uncapped.
+    #[must_use]
     pub fn max_supply(env: Env) -> Option<i128> {
         env.storage().instance().get(&DataKey::MaxSupply)
     }
@@ -348,6 +353,7 @@ impl TokenContract {
 
 #[contractimpl]
 impl token::TokenInterface for TokenContract {
+    #[must_use]
     fn allowance(env: Env, from: Address, spender: Address) -> i128 {
         let key = DataKey::Allowance(AllowanceDataKey {
             from: from.clone(),
@@ -387,6 +393,7 @@ impl token::TokenInterface for TokenContract {
         }
     }
 
+    #[must_use]
     fn balance(env: Env, id: Address) -> i128 {
         // Returns 0 for both unknown addresses and addresses with a zero balance.
         // Use `balance_of` to distinguish between the two cases.
@@ -527,6 +534,7 @@ impl token::TokenInterface for TokenContract {
         events::burned(&env, &from, amount);
     }
 
+    #[must_use]
     fn decimals(env: Env) -> u32 {
         env.storage()
             .instance()
@@ -534,6 +542,7 @@ impl token::TokenInterface for TokenContract {
             .unwrap()
     }
 
+    #[must_use]
     fn name(env: Env) -> String {
         env.storage()
             .instance()
@@ -541,6 +550,7 @@ impl token::TokenInterface for TokenContract {
             .unwrap()
     }
 
+    #[must_use]
     fn symbol(env: Env) -> String {
         env.storage()
             .instance()
