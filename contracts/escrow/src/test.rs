@@ -627,6 +627,68 @@ fn test_approve_delivery_by_arbiter_fails() {
     client.approve_delivery();
 }
 
+#[test]
+fn test_release_partial() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, _arbiter, _token, amount) = setup_funded_escrow(&env);
+    let partial = amount / 2;
+    
+    client.release_partial(&partial);
+    
+    // Verify state is still Funded
+    assert_eq!(client.get_state(), Some(EscrowState::Funded));
+    
+    // Verify amount was decremented
+    let info = client.get_escrow_info();
+    assert_eq!(info.amount, amount - partial);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #2)")]
+fn test_release_partial_invalid_state() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let buyer = Address::generate(&env);
+    let seller = Address::generate(&env);
+    let arbiter = Address::generate(&env);
+    let token = create_mock_token(&env);
+    let amount = 1_000i128;
+    let deadline = env.ledger().sequence() + 100;
+
+    let (client, _) = create_escrow_contract(&env);
+    client.initialize(&buyer, &seller, &arbiter, &token, &amount, &deadline);
+    
+    // Try to release_partial in Created state — should fail with InvalidState
+    client.release_partial(&500i128);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_release_partial_exceeds_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, _arbiter, _token, amount) = setup_funded_escrow(&env);
+    
+    // Try to release more than available — should fail with InsufficientFunds
+    client.release_partial(&(amount + 1));
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #8)")]
+fn test_release_partial_zero_amount() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, _, _buyer, _seller, _arbiter, _token, _amount) = setup_funded_escrow(&env);
+    
+    // Try to release zero amount — should fail with InvalidAmount
+    client.release_partial(&0i128);
+}
+
 // ---------------------------------------------------------------------------
 // Feature-gated tests
 // ---------------------------------------------------------------------------
