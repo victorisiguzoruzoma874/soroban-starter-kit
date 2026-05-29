@@ -13,7 +13,7 @@ use soroban_sdk::contracterror;
 /// }
 /// ```
 #[contracterror]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum EscrowError {
     /// The caller is not permitted to perform this action.
     NotAuthorized = 1,
