@@ -773,6 +773,7 @@ fn test_burn_from_expired_allowance() {
 }
 
 #[test]
+#[should_panic(expected = "Error(Contract, #3)")]
 #[should_panic(expected = "InvalidAction")]
 #[should_panic(expected = "Error(Auth, InvalidAction)")]
 fn test_unauthorized_admin_burn_fails() {

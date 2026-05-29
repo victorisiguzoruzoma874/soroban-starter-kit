@@ -1,9 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, token, Address, Env, String,
+    contract, contractimpl, panic_with_error, token::{self, TokenInterface}, Address, Env, String,
 };
-use token::TokenInterface as _;
 
 mod admin;
 mod errors;
@@ -15,10 +14,8 @@ mod test;
 
 use admin::require_admin;
 use errors::TokenError;
+use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 use storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
-
-const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
-const LEDGER_BUMP_AMOUNT: u32 = 518_400;
 
 fn bump_instance(env: &Env) {
     env.storage()
@@ -533,6 +530,7 @@ impl TokenContract {
 
 #[contractimpl]
 impl token::TokenInterface for TokenContract {
+    #[must_use]
     fn allowance(env: Env, from: Address, spender: Address) -> i128 {
         let key = DataKey::Allowance(AllowanceDataKey {
             from: from.clone(),
@@ -572,6 +570,7 @@ impl token::TokenInterface for TokenContract {
         }
     }
 
+    #[must_use]
     fn balance(env: Env, id: Address) -> i128 {
         // Returns 0 for both unknown addresses and addresses with a zero balance.
         // Use `balance_of` to distinguish between the two cases.
@@ -710,6 +709,7 @@ impl token::TokenInterface for TokenContract {
         events::burned(&env, &from, amount);
     }
 
+    #[must_use]
     fn decimals(env: Env) -> u32 {
         env.storage()
             .instance()
@@ -717,6 +717,7 @@ impl token::TokenInterface for TokenContract {
             .unwrap_or_default()
     }
 
+    #[must_use]
     fn name(env: Env) -> String {
         env.storage()
             .instance()
@@ -724,6 +725,7 @@ impl token::TokenInterface for TokenContract {
             .unwrap_or_else(|| String::from_str(&env, ""))
     }
 
+    #[must_use]
     fn symbol(env: Env) -> String {
         env.storage()
             .instance()

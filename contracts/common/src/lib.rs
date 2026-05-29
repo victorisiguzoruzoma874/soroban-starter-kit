@@ -107,3 +107,10 @@ where
         .persistent()
         .extend_ttl(key, threshold, extend_to);
 }
+
+/// Ledger threshold for TTL extension (~14 days at 5 seconds per ledger).
+/// When remaining TTL falls below this, storage is extended to `LEDGER_BUMP_AMOUNT`.
+pub const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
+
+/// Target TTL (in ledgers) after each extension (~60 days at 5 seconds per ledger).
+pub const LEDGER_BUMP_AMOUNT: u32 = 518_400;

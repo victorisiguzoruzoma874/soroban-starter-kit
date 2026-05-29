@@ -12,6 +12,11 @@ pub use storage::{DataKey, EscrowInfo, EscrowState};
 
 use storage::DataKey::{Arbiter, Amount, Buyer, Deadline, Seller, State, TokenContract, BuyerApproved, SellerDelivered};
 use admin::require_admin;
+use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
+use storage::DataKey::*;
+
+/// Minimum number of ledgers the deadline must be in the future.
+const MIN_DEADLINE_BUFFER: u32 = 10;
 use soroban_common::MIN_DEADLINE_BUFFER;
 use storage::DataKey::*;
 
@@ -567,6 +572,17 @@ impl EscrowContract {
             deadline: env.storage().instance().get(&Deadline)?,
             state: env.storage().instance().get(&State)?,
     /// Return full escrow details as an [`EscrowInfo`] struct.
+    #[must_use]
+    pub fn get_escrow_info(env: Env) -> EscrowInfo {
+        EscrowInfo {
+            buyer: env.storage().instance().get(&Buyer).unwrap(),
+            seller: env.storage().instance().get(&Seller).unwrap(),
+            arbiter: env.storage().instance().get(&Arbiter).unwrap(),
+            token_contract: env.storage().instance().get(&TokenContract).unwrap(),
+            amount: env.storage().instance().get(&Amount).unwrap(),
+            deadline: env.storage().instance().get(&Deadline).unwrap(),
+            state: env.storage().instance().get(&State).unwrap(),
+        }
     pub fn get_escrow_info(env: Env) -> Result<EscrowInfo, EscrowError> {
         Ok(EscrowInfo {
             buyer: Self::get_required(&env, &Buyer)?,
