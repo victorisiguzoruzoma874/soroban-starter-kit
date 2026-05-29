@@ -28,7 +28,7 @@ pub enum DataKey {
     Paused,
     /// Contract version number (`u32`).
     Version,
-    /// Pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
+    /// Pending WASM upgrade: `(BytesN<32>, u32)` = (hash, `ready_after_ledger`).
     PendingUpgrade,
 }
 

@@ -15,7 +15,7 @@ pub enum DataKey {
     Paused,
     /// Instance storage – maximum tokens that may ever be minted (`i128`).
     MaxSupply,
-    /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
+    /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, `ready_after_ledger`).
     PendingUpgrade,
 }
 

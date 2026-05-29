@@ -18,7 +18,6 @@ lto = true
 codegen-units = 1
 
 [workspace.package]
-name = "soroban-contract-templates"
 description = "Production-ready Soroban smart contract templates"
 authors = ["Soroban Templates Contributors"]
 license = "Apache-2.0"

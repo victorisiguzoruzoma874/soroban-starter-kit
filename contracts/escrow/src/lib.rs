@@ -10,8 +10,7 @@ mod storage;
 pub use errors::EscrowError;
 pub use storage::{DataKey, EscrowInfo, EscrowState};
 
-use admin::require_admin;
-use storage::DataKey::*;
+use storage::DataKey::{Arbiter, Amount, Buyer, Deadline, Seller, State, TokenContract, BuyerApproved, SellerDelivered};
 
 /// Extend storage TTL when remaining ledgers fall below this threshold.
 const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
@@ -42,6 +41,17 @@ impl EscrowContract {
     /// `token_contract` must be a valid Soroban token contract that implements the
     /// token interface (i.e. responds to `decimals()`). Passing an address that does
     /// not implement the token interface will cause this call to panic.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::AlreadyInitialized`] if the contract has already been initialized.
+    /// Returns [`EscrowError::InvalidAmount`] if `amount` <= 0.
+    /// Returns [`EscrowError::InvalidParties`] if any two parties are the same address.
+    /// Returns [`EscrowError::DeadlinePassed`] if `deadline_ledger` is not at least `MIN_DEADLINE_BUFFER` ledgers in the future.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `token_contract` does not implement the token interface.
     pub fn initialize(
         env: Env,
         buyer: Address,
@@ -88,6 +98,12 @@ impl EscrowContract {
     }
 
     /// Buyer funds the escrow by transferring tokens to the contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Created` state.
+    /// Returns [`EscrowError::InsufficientFunds`] if the buyer's balance is less than the escrow amount.
     pub fn fund(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -127,6 +143,11 @@ impl EscrowContract {
     }
 
     /// Seller marks goods/services as delivered.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Funded` state.
     pub fn mark_delivered(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -158,6 +179,11 @@ impl EscrowContract {
     }
 
     /// Buyer approves delivery, releasing funds to the seller.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Delivered` state.
     pub fn approve_delivery(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -173,6 +199,12 @@ impl EscrowContract {
     }
 
     /// Buyer requests a refund after the deadline has passed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::DeadlineNotReached`] if the deadline has not yet passed.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Funded` or `Delivered` state.
     pub fn request_refund(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -205,6 +237,12 @@ impl EscrowContract {
     }
 
     /// Buyer or seller raises a dispute.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::NotAuthorized`] if the caller is neither the buyer nor the seller.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Funded` or `Delivered` state.
     pub fn raise_dispute(env: Env, caller: Address) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -244,6 +282,11 @@ impl EscrowContract {
     }
 
     /// Arbiter resolves a dispute.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Disputed` state.
     pub fn resolve_dispute(env: Env, release_to_seller: bool) -> Result<(), EscrowError> {
         let arbiter: Address = env
             .storage()
@@ -271,6 +314,11 @@ impl EscrowContract {
     }
 
     /// Buyer cancels an unfunded escrow (`Created` state only).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Created` state.
     pub fn cancel(env: Env) -> Result<(), EscrowError> {
         let buyer: Address = env
             .storage()
@@ -298,6 +346,10 @@ impl EscrowContract {
     }
 
     /// Extend storage TTL. Anyone can call this to keep an active escrow alive.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
     pub fn bump(env: Env) -> Result<(), EscrowError> {
         if !env.storage().instance().has(&State) {
             return Err(EscrowError::NotInitialized);
@@ -307,6 +359,10 @@ impl EscrowContract {
     }
 
     /// Return full escrow details as an [`EscrowInfo`] struct.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the contract has not been initialized.
     pub fn get_escrow_info(env: Env) -> EscrowInfo {
         EscrowInfo {
             buyer: env.storage().instance().get(&Buyer).unwrap(),
@@ -320,11 +376,13 @@ impl EscrowContract {
     }
 
     /// Return the current [`EscrowState`], or `None` if not initialized.
+    #[must_use]
     pub fn get_state(env: Env) -> Option<EscrowState> {
         env.storage().instance().get(&State)
     }
 
     /// Return `true` if the deadline ledger has been passed.
+    #[must_use]
     pub fn is_deadline_passed(env: Env) -> bool {
         let deadline: u32 = env.storage().instance().get(&Deadline).unwrap_or(0);
         env.ledger().sequence() > deadline
@@ -339,6 +397,10 @@ impl EscrowContract {
     const UPGRADE_DELAY_LEDGERS: u32 = 17_280;
 
     /// Pause the contract. Admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotAuthorized`] if the caller is not the admin.
     pub fn pause(env: Env) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -349,6 +411,10 @@ impl EscrowContract {
     }
 
     /// Unpause the contract. Admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotAuthorized`] if the caller is not the admin.
     pub fn unpause(env: Env) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -359,6 +425,7 @@ impl EscrowContract {
     }
 
     /// Return the git commit hash baked in at compile time.
+    #[must_use]
     pub fn version(env: Env) -> soroban_sdk::String {
         soroban_sdk::String::from_str(&env, env!("GIT_HASH"))
     }
@@ -367,6 +434,10 @@ impl EscrowContract {
     ///
     /// Stores `wasm_hash` and a `ready_after` ledger number. The upgrade cannot
     /// be executed until at least `UPGRADE_DELAY_LEDGERS` ledgers have passed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotAuthorized`] if the caller is not the admin.
     pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -385,6 +456,10 @@ impl EscrowContract {
     /// Execute a previously proposed WASM upgrade. Admin only.
     ///
     /// Fails if no upgrade has been proposed or if the timelock has not yet elapsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotAuthorized`] if the caller is not the admin, no upgrade is pending, or the timelock has not elapsed.
     pub fn execute_upgrade(env: Env) -> Result<(), EscrowError> {
         let admin = require_admin(&env)?;
         admin.require_auth();

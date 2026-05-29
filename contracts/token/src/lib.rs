@@ -53,6 +53,11 @@ impl TokenContract {
     /// Initialize the token with metadata and an admin. Must be called once.
     ///
     /// `max_supply` is only enforced when the `capped-supply` feature is enabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::AlreadyInitialized`] if the contract has already been initialized.
+    /// Returns [`TokenError::InvalidAmount`] if `max_supply` is provided and is <= 0.
     pub fn initialize(
         env: Env,
         admin: Address,
@@ -91,6 +96,12 @@ impl TokenContract {
     }
 
     /// Mint `amount` tokens to `to`. Admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::InvalidAmount`] if `amount` <= 0.
+    /// Returns [`TokenError::Overflow`] if the mint would overflow the total supply.
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn mint(env: Env, to: Address, amount: i128) -> Result<(), TokenError> {
         #[cfg(feature = "pausable")]
         require_not_paused(&env)?;
@@ -140,6 +151,13 @@ impl TokenContract {
     }
 
     /// Burn `amount` tokens from `from`. Admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::InvalidAmount`] if `amount` <= 0.
+    /// Returns [`TokenError::InsufficientBalance`] if `from` has fewer than `amount` tokens.
+    /// Returns [`TokenError::Overflow`] if the burn would underflow the total supply.
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn admin_burn(env: Env, from: Address, amount: i128) -> Result<(), TokenError> {
         #[cfg(feature = "pausable")]
         require_not_paused(&env)?;
@@ -178,6 +196,10 @@ impl TokenContract {
     /// The transfer is not final until `new_admin` calls [`accept_admin`].
     /// Replaces the one-step `set_admin` to prevent accidental loss of admin
     /// access from a typo in the new address.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the current admin.
     pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -191,6 +213,10 @@ impl TokenContract {
     }
 
     /// Accept a pending admin transfer. Must be called by the pending admin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if there is no pending admin or the caller is not the pending admin.
     pub fn accept_admin(env: Env) -> Result<(), TokenError> {
         let pending: Address = env
             .storage()
@@ -207,6 +233,10 @@ impl TokenContract {
     }
 
     /// Cancel a pending admin transfer. Current admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the current admin.
     pub fn cancel_admin_transfer(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -228,6 +258,11 @@ impl TokenContract {
     }
 
     /// Return the current admin address.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the contract has not been initialized.
+    #[must_use]
     pub fn admin(env: Env) -> Address {
         env.storage()
             .instance()
@@ -236,6 +271,7 @@ impl TokenContract {
     }
 
     /// Return the current total token supply.
+    #[must_use]
     pub fn total_supply(env: Env) -> i128 {
         env.storage()
             .instance()
@@ -250,6 +286,7 @@ impl TokenContract {
     /// addresses with a zero balance), `balance_of` lets callers distinguish
     /// between "never seen this address" (`None`) and "address exists with a
     /// zero balance" (`Some(0)`).
+    #[must_use]
     pub fn balance_of(env: Env, id: Address) -> Option<i128> {
         env.storage()
             .persistent()
@@ -257,6 +294,7 @@ impl TokenContract {
     }
 
     /// Return the git commit hash baked in at compile time.
+    #[must_use]
     pub fn version(env: Env) -> String {
         String::from_str(&env, env!("GIT_HASH"))
     }
@@ -267,6 +305,10 @@ impl TokenContract {
 #[contractimpl]
 impl TokenContract {
     /// Pause all token operations. Admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn pause(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -277,6 +319,10 @@ impl TokenContract {
     }
 
     /// Resume all token operations. Admin only.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn unpause(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -298,6 +344,10 @@ impl TokenContract {
     ///
     /// Stores `wasm_hash` and a `ready_after` ledger number. The upgrade cannot
     /// be executed until at least `UPGRADE_DELAY_LEDGERS` ledgers have passed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -316,6 +366,10 @@ impl TokenContract {
     /// Execute a previously proposed WASM upgrade. Admin only.
     ///
     /// Fails if no upgrade has been proposed or if the timelock has not yet elapsed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin, no upgrade is pending, or the timelock has not elapsed.
     pub fn execute_upgrade(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -344,6 +398,7 @@ impl TokenContract {
 #[contractimpl]
 impl TokenContract {
     /// Return the configured maximum supply cap, or `None` if uncapped.
+    #[must_use]
     pub fn max_supply(env: Env) -> Option<i128> {
         env.storage().instance().get(&DataKey::MaxSupply)
     }
