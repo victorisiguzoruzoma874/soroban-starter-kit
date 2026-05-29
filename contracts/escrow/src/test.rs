@@ -220,6 +220,9 @@ fn test_initialize_seller_equals_arbiter_fails() {
     let deadline = env.ledger().sequence() + 100;
     let (client, _) = create_escrow_contract(&env);
     client.initialize(&buyer, &same, &same, &token, &1_000, &deadline);
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #8)")]
 fn test_initialize_zero_amount_fails() {
     let env = Env::default();
@@ -563,8 +566,26 @@ fn test_bump_initialized_succeeds() {
 #[test]
 #[should_panic(expected = "Error(Contract, #2)")]
 fn test_fund_twice_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // Already Funded; calling fund again must fail with InvalidState (#2)
+    client.fund();
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #4)")]
 fn test_request_refund_before_deadline_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let (client, ..) = setup_funded_escrow(&env);
+    // Deadline is sequence + 100; current sequence is 0 → deadline not reached → DeadlineNotReached (#4)
+    client.request_refund();
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #2)")]
 fn test_approve_delivery_without_mark_delivered_fails() {
     let env = Env::default();
