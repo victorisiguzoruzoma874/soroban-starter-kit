@@ -358,21 +358,18 @@ impl EscrowContract {
         Ok(())
     }
 
-    /// Return full escrow details as an [`EscrowInfo`] struct.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the contract has not been initialized.
-    pub fn get_escrow_info(env: Env) -> EscrowInfo {
-        EscrowInfo {
-            buyer: env.storage().instance().get(&Buyer).unwrap(),
-            seller: env.storage().instance().get(&Seller).unwrap(),
-            arbiter: env.storage().instance().get(&Arbiter).unwrap(),
-            token_contract: env.storage().instance().get(&TokenContract).unwrap(),
-            amount: env.storage().instance().get(&Amount).unwrap(),
-            deadline: env.storage().instance().get(&Deadline).unwrap(),
-            state: env.storage().instance().get(&State).unwrap(),
-        }
+    /// Return full escrow details as an [`EscrowInfo`] struct, or `None` if not initialized.
+    #[must_use]
+    pub fn get_escrow_info(env: Env) -> Option<EscrowInfo> {
+        Some(EscrowInfo {
+            buyer: env.storage().instance().get(&Buyer)?,
+            seller: env.storage().instance().get(&Seller)?,
+            arbiter: env.storage().instance().get(&Arbiter)?,
+            token_contract: env.storage().instance().get(&TokenContract)?,
+            amount: env.storage().instance().get(&Amount)?,
+            deadline: env.storage().instance().get(&Deadline)?,
+            state: env.storage().instance().get(&State)?,
+        })
     }
 
     /// Return the current [`EscrowState`], or `None` if not initialized.

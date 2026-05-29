@@ -59,7 +59,7 @@ pub enum EscrowState {
 /// Snapshot of all escrow fields returned by
 /// [`EscrowContract::get_escrow_info`](crate::EscrowContract::get_escrow_info).
 #[contracttype]
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EscrowInfo {
     /// Buyer address.
     pub buyer: Address,

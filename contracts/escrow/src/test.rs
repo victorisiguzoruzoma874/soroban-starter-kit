@@ -118,7 +118,7 @@ fn test_initialize() {
 
     client.initialize(&buyer, &seller, &arbiter, &token_contract, &amount, &deadline);
 
-    let info = client.get_escrow_info();
+    let info = client.get_escrow_info().expect("escrow should be initialized");
     assert_eq!(info.buyer, buyer);
     assert_eq!(info.seller, seller);
     assert_eq!(info.arbiter, arbiter);
@@ -261,7 +261,7 @@ fn test_initialize_escrow() {
 
     let (client, _, buyer, seller, _, _, amount) = setup_funded_escrow(&env);
 
-    let info = client.get_escrow_info();
+    let info = client.get_escrow_info().expect("escrow should be initialized");
     assert_eq!(info.buyer, buyer);
     assert_eq!(info.seller, seller);
     assert_eq!(info.amount, amount);
@@ -535,12 +535,11 @@ fn test_fund_insufficient_funds() {
 }
 
 #[test]
-#[should_panic]
-fn test_get_escrow_info_uninitialized_panics() {
+fn test_get_escrow_info_uninitialized_returns_none() {
     let env = Env::default();
     let (client, _) = create_escrow_contract(&env);
-    // Calling get_escrow_info on uninitialized contract should panic
-    let _ = client.get_escrow_info();
+    // Calling get_escrow_info on uninitialized contract should return None
+    assert_eq!(client.get_escrow_info(), None);
 }
 
 #[test]
