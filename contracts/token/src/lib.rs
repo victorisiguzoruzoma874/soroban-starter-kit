@@ -15,10 +15,8 @@ mod test;
 
 use admin::require_admin;
 use errors::TokenError;
+use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 use storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
-
-const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
-const LEDGER_BUMP_AMOUNT: u32 = 518_400;
 
 fn bump_instance(env: &Env) {
     env.storage()
