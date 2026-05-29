@@ -239,6 +239,18 @@
                         "key": {
                           "vec": [
                             {
+                              "symbol": "RequiredSignatures"
+                            }
+                          ]
+                        },
+                        "val": {
+                          "u32": 1
+                        }
+                      },
+                      {
+                        "key": {
+                          "vec": [
+                            {
                               "symbol": "Seller"
                             }
                           ]
