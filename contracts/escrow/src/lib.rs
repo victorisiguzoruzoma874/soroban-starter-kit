@@ -334,6 +334,50 @@ impl EscrowContract {
         Ok(())
     }
 
+    /// Extend the escrow deadline by mutual consent (buyer and seller auth required).
+    pub fn extend_deadline(env: Env, new_deadline: u32) -> Result<(), EscrowError> {
+        let buyer: Address = env
+            .storage()
+            .instance()
+            .get(&Buyer)
+            .ok_or(EscrowError::NotInitialized)?;
+        let seller: Address = env
+            .storage()
+            .instance()
+            .get(&Seller)
+            .ok_or(EscrowError::NotInitialized)?;
+
+        buyer.require_auth();
+        seller.require_auth();
+
+        let current_deadline: u32 = env
+            .storage()
+            .instance()
+            .get(&Deadline)
+            .ok_or(EscrowError::NotInitialized)?;
+
+        if new_deadline <= current_deadline {
+            return Err(EscrowError::DeadlinePassed);
+        }
+
+        let state: EscrowState = env
+            .storage()
+            .instance()
+            .get(&State)
+            .ok_or(EscrowError::NotInitialized)?;
+        if !matches!(state, EscrowState::Funded | EscrowState::Delivered) {
+            return Err(EscrowError::InvalidState);
+        }
+
+        env.storage().instance().set(&Deadline, &new_deadline);
+        bump_instance(&env);
+
+        env.events()
+            .publish((Symbol::new(&env, "deadline_extended"), buyer), new_deadline);
+
+        Ok(())
+    }
+
     /// Extend storage TTL. Anyone can call this to keep an active escrow alive.
     pub fn bump(env: Env) -> Result<(), EscrowError> {
         if !env.storage().instance().has(&State) {
@@ -365,6 +409,16 @@ impl EscrowContract {
     pub fn is_deadline_passed(env: Env) -> bool {
         let deadline: u32 = env.storage().instance().get(&Deadline).unwrap_or(0);
         env.ledger().sequence() > deadline
+    }
+
+    /// Return the number of ledgers remaining until the deadline.
+    ///
+    /// Returns a negative value if the deadline has already passed.
+    /// Each ledger takes approximately 5 seconds on the Stellar network.
+    pub fn get_remaining_ledgers(env: Env) -> i64 {
+        let deadline: u32 = env.storage().instance().get(&Deadline).unwrap_or(0);
+        let current_sequence: u32 = env.ledger().sequence();
+        deadline as i64 - current_sequence as i64
     }
 }
 
