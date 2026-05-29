@@ -15,14 +15,8 @@ pub enum DataKey {
     Paused,
     /// Instance storage – maximum tokens that may ever be minted (`i128`).
     MaxSupply,
-    /// Instance storage – pending admin address for two-step admin transfer.
-    PendingAdmin,
     /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
     PendingUpgrade,
-    /// Instance storage – pending admin transfer.
-    /// Instance storage – pending admin address for two-step admin transfer.
-    /// Instance storage – address of the pending new admin awaiting acceptance.
-    PendingAdmin,
 }
 
 #[contracttype]

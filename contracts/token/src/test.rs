@@ -709,6 +709,9 @@ fn test_transfer_from_preserves_expiration() {
     env.ledger().with_mut(|l| l.sequence_number = expiration + 1);
     // Allowance should now be expired (return 0)
     assert_eq!(client.allowance(&user1, &spender), 0i128);
+}
+
+#[test]
 fn test_burn_from() {
     let env = Env::default();
     env.mock_all_auths();
