@@ -128,7 +128,7 @@ fn test_full_escrow_lifecycle_arbiter_resolves_to_seller() {
     escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &amount, &deadline);
     escrow.fund();
 
-    escrow.raise_dispute();
+    escrow.raise_dispute(&buyer);
     escrow.resolve_dispute(&true); // true → release to seller
     assert_eq!(escrow.get_state(), Some(EscrowState::Completed));
     assert_eq!(token.balance(&seller), amount);
@@ -155,7 +155,7 @@ fn test_full_escrow_lifecycle_arbiter_resolves_to_buyer() {
     escrow.initialize(&buyer, &seller, &arbiter, &token_addr, &amount, &deadline);
     escrow.fund();
 
-    escrow.raise_dispute();
+    escrow.raise_dispute(&buyer);
     escrow.resolve_dispute(&false); // false → refund to buyer
     assert_eq!(escrow.get_state(), Some(EscrowState::Refunded));
     assert_eq!(token.balance(&buyer), amount);

@@ -12,9 +12,9 @@ A curated collection of production-ready Soroban smart contract templates. These
 git clone https://github.com/your-username/soroban-contract-templates.git
 cd soroban-contract-templates
 
-# Build a contract (example: token)
-cd contracts/token
-stellar contract build
+# Build a contract from the repo root (example: token)
+stellar contract build --manifest-path contracts/token/Cargo.toml
+# Alternatively: cd contracts/token && stellar contract build
 
 # Deploy to testnet
 ./scripts/deploy.sh testnet

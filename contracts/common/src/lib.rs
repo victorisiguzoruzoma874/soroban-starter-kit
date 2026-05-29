@@ -2,6 +2,11 @@
 
 use soroban_sdk::{contracttype, Address, Env};
 
+/// Minimum number of ledgers the deadline must be ahead of the current ledger
+/// when initializing an escrow. Enforced by the contract; tests must respect
+/// this value to avoid generating deadlines the contract would reject.
+pub const MIN_DEADLINE_BUFFER: u32 = 10;
+
 /// Storage key for the contract administrator address.
 ///
 /// Used in instance storage to persist the admin [`Address`] across invocations.
@@ -28,6 +33,7 @@ pub enum AdminKey {
 /// ```ignore
 /// let admin: Address = soroban_common::get_admin(&env);
 /// ```
+#[must_use]
 pub fn get_admin(env: &Env) -> Address {
     env.storage()
         .instance()
@@ -44,6 +50,7 @@ pub fn get_admin(env: &Env) -> Address {
 ///     // admin is set
 /// }
 /// ```
+#[must_use]
 pub fn try_get_admin(env: &Env) -> Option<Address> {
     env.storage().instance().get(&AdminKey::Admin)
 }

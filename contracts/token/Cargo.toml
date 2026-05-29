@@ -10,6 +10,7 @@ license.workspace = true
 pausable = []
 upgradeable = []
 capped-supply = []
+freeze = []
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -26,6 +27,7 @@ proptest = { workspace = true }
 [[bin]]
 name = "deploy"
 path = "src/bin/deploy.rs"
+doc = false
 
 [lints]
 workspace = true

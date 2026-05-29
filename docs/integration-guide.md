@@ -113,7 +113,69 @@ contract.call('refund', escrowIdScVal);
 
 ---
 
-## 8. React / Frontend Integration
+## 8. Event Topic Convention
+
+All events in both Token and Escrow contracts follow a standardized topic structure for consistent indexing:
+
+### Topic Structure
+
+Events are published with topics in the following format:
+- **Topic 0**: Event name (Symbol)
+- **Topic 1**: Primary actor (Address) — typically the initiator or affected party
+- **Topic 2** (optional): Secondary actor (Address) — for two-party operations
+- **Topic 3** (optional): Tertiary actor (Address) — for three-party operations
+
+### Token Contract Events
+
+| Event | Topics | Data |
+|-------|--------|------|
+| `initialized` | `(Symbol, Address)` | `(name, symbol, decimals)` |
+| `mint` | `(Symbol, Address)` | `amount` |
+| `burn` | `(Symbol, Address)` | `amount` |
+| `transfer` | `(Symbol, Address, Address)` | `amount` |
+| `approve` | `(Symbol, Address, Address)` | `amount` |
+| `revoke` | `(Symbol, Address, Address)` | `()` |
+| `admin_changed` | `(Symbol, Address)` | `new_admin` |
+| `paused` | `(Symbol, Address)` | `()` |
+| `unpaused` | `(Symbol, Address)` | `()` |
+| `upgraded` | `(Symbol, Address)` | `wasm_hash` |
+
+### Escrow Contract Events
+
+| Event | Topics | Data |
+|-------|--------|------|
+| `initialized` | `(Symbol, Address, Address, Address)` | `amount` |
+| `escrow_created` | `(Symbol, Address, Address)` | `amount` |
+| `escrow_funded` | `(Symbol, Address)` | `amount` |
+| `delivery_marked` | `(Symbol, Address)` | `()` |
+| `funds_released` | `(Symbol, Address)` | `amount` |
+| `funds_refunded` | `(Symbol, Address)` | `amount` |
+| `dispute_raised` | `(Symbol, Address)` | `()` |
+| `paused` | `(Symbol, Address)` | `()` |
+| `unpaused` | `(Symbol, Address)` | `()` |
+| `upgraded` | `(Symbol, Address)` | `wasm_hash` |
+
+### Indexing Events
+
+When indexing events, filter by topic structure:
+
+```ts
+// Token: Get all transfers from an address
+const transfers = events.filter(e => 
+  e.topics[0] === 'transfer' && 
+  e.topics[1] === senderAddress
+);
+
+// Escrow: Get all escrows created by a buyer
+const escrows = events.filter(e => 
+  e.topics[0] === 'escrow_created' && 
+  e.topics[1] === buyerAddress
+);
+```
+
+---
+
+## 9. React / Frontend Integration
 
 ```tsx
 import { WalletContext } from './context/WalletContext';
@@ -132,7 +194,7 @@ See `src/components/ContractInteractionUI.tsx` for a full working example.
 
 ---
 
-## 9. Validation Checklist
+## 10. Validation Checklist
 
 - [ ] Contract ID is correct for the target network
 - [ ] Network passphrase matches the RPC endpoint
@@ -143,7 +205,7 @@ See `src/components/ContractInteractionUI.tsx` for a full working example.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
@@ -178,7 +240,7 @@ front-running, upgrade timelocks, and event monitoring, see
 
 ---
 
-## Resources
+## 12. Resources
 
 - [Stellar SDK Docs](https://stellar.github.io/js-stellar-sdk/)
 - [Soroban Documentation](https://soroban.stellar.org/docs)
