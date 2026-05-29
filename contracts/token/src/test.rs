@@ -779,3 +779,117 @@ fn test_unauthorized_admin_burn_fails() {
     env.set_auths(&[]);
     client.admin_burn(&user, &100i128);
 }
+
+
+#[test]
+fn test_propose_admin() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.propose_admin(&new_admin);
+
+    // Admin should still be the old admin
+    assert_eq!(client.admin(), admin);
+}
+
+#[test]
+fn test_accept_admin() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.propose_admin(&new_admin);
+    client.accept_admin();
+
+    // Admin should now be the new admin
+    assert_eq!(client.admin(), new_admin);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_accept_admin_without_proposal_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    // Try to accept without a proposal
+    client.accept_admin();
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_accept_admin_by_wrong_address_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let wrong_address = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.propose_admin(&new_admin);
+    
+    // Try to accept as wrong address
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let contract_address = env.register_contract(None, TokenContract);
+    env.mock_auths(&[MockAuth {
+        address: &wrong_address,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "accept_admin",
+            args: soroban_sdk::vec![&env].into(),
+            sub_invokes: &[],
+        },
+    }]);
+    client.accept_admin();
+}
+
+#[test]
+fn test_cancel_admin_proposal() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.propose_admin(&new_admin);
+    client.cancel_admin_proposal();
+
+    // Admin should still be the old admin
+    assert_eq!(client.admin(), admin);
+    
+    // Trying to accept should fail since proposal was cancelled
+    assert!(client.try_accept_admin().is_err());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #3)")]
+fn test_cancel_admin_proposal_by_non_admin_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+    let non_admin = Address::generate(&env);
+    let client = init_token(&env, &admin);
+
+    client.propose_admin(&new_admin);
+    
+    // Try to cancel as non-admin
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let contract_address = env.register_contract(None, TokenContract);
+    env.mock_auths(&[MockAuth {
+        address: &non_admin,
+        invoke: &MockAuthInvoke {
+            contract: &contract_address,
+            fn_name: "cancel_admin_proposal",
+            args: soroban_sdk::vec![&env].into(),
+            sub_invokes: &[],
+        },
+    }]);
+    client.cancel_admin_proposal();
+}

@@ -183,10 +183,7 @@ impl TokenContract {
         admin.require_auth();
         env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
         bump_instance(&env);
-        env.events().publish(
-            (soroban_sdk::Symbol::new(&env, "admin_proposed"), admin),
-            new_admin,
-        );
+        events::admin_proposed(&env, &admin, &new_admin);
         Ok(())
     }
 
@@ -202,16 +199,17 @@ impl TokenContract {
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
         bump_instance(&env);
-        events::admin_changed(&env, &old_admin, &pending);
+        events::admin_accepted(&env, &pending);
         Ok(())
     }
 
     /// Cancel a pending admin transfer. Current admin only.
-    pub fn cancel_admin_transfer(env: Env) -> Result<(), TokenError> {
+    pub fn cancel_admin_proposal(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().remove(&DataKey::PendingAdmin);
         bump_instance(&env);
+        events::admin_proposal_cancelled(&env, &admin);
         Ok(())
     }
 

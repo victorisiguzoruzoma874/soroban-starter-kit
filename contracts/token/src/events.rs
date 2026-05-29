@@ -16,6 +16,18 @@ pub fn admin_changed(env: &Env, old_admin: &Address, new_admin: &Address) {
     env.events().publish((Symbol::new(env, "admin_changed"), old_admin.clone()), new_admin.clone());
 }
 
+pub fn admin_proposed(env: &Env, current_admin: &Address, pending_admin: &Address) {
+    env.events().publish((Symbol::new(env, "admin_proposed"), current_admin.clone()), pending_admin.clone());
+}
+
+pub fn admin_accepted(env: &Env, new_admin: &Address) {
+    env.events().publish((Symbol::new(env, "admin_accepted"), new_admin.clone()), ());
+}
+
+pub fn admin_proposal_cancelled(env: &Env, admin: &Address) {
+    env.events().publish((Symbol::new(env, "admin_proposal_cancelled"), admin.clone()), ());
+}
+
 pub fn approved(env: &Env, from: &Address, spender: &Address, amount: i128) {
     env.events().publish((Symbol::new(env, "approve"), from.clone(), spender.clone()), amount);
 }

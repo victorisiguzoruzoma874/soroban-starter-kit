@@ -167,6 +167,48 @@ impl EscrowContract {
         Self::release_to_seller(env)
     }
 
+    /// Buyer releases a partial amount to the seller (milestone-based payments).
+    /// Only callable in `Funded` state. Decrements the stored amount.
+    pub fn release_partial(env: Env, amount: i128) -> Result<(), EscrowError> {
+        #[cfg(feature = "pausable")]
+        Self::require_not_paused(&env)?;
+
+        let buyer: Address = env
+            .storage()
+            .instance()
+            .get(&Buyer)
+            .ok_or(EscrowError::NotInitialized)?;
+        buyer.require_auth();
+
+        let state: EscrowState = env
+            .storage()
+            .instance()
+            .get(&State)
+            .ok_or(EscrowError::NotInitialized)?;
+        if state != EscrowState::Funded {
+            return Err(EscrowError::InvalidState);
+        }
+
+        if amount <= 0 {
+            return Err(EscrowError::InvalidAmount);
+        }
+
+        let stored_amount: i128 = env.storage().instance().get(&Amount).unwrap();
+        if amount > stored_amount {
+            return Err(EscrowError::InsufficientFunds);
+        }
+
+        let seller: Address = env.storage().instance().get(&Seller).unwrap();
+        let new_amount = stored_amount - amount;
+        env.storage().instance().set(&Amount, &new_amount);
+        bump_instance(&env);
+
+        admin::transfer_token(&env, &env.current_contract_address(), &seller, amount);
+        events::partial_release(&env, &seller, amount);
+
+        Ok(())
+    }
+
     /// Buyer requests a refund after the deadline has passed.
     pub fn request_refund(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
