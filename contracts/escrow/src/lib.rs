@@ -184,24 +184,16 @@ impl EscrowContract {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
 
-        let buyer: Address = env
-            .storage()
-            .instance()
-            .get(&Buyer)
-            .ok_or(EscrowError::NotInitialized)?;
+        let buyer: Address = Self::get_required(&env, &Buyer)?;
         buyer.require_auth();
 
-        let state: EscrowState = env
-            .storage()
-            .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
+        let state: EscrowState = Self::get_required(&env, &State)?;
         if state != EscrowState::Created {
             return Err(EscrowError::InvalidState);
         }
 
-        let token_contract: Address = env.storage().instance().get(&TokenContract).unwrap();
-        let amount: i128 = env.storage().instance().get(&Amount).unwrap();
+        let token_contract: Address = Self::get_required(&env, &TokenContract)?;
+        let amount: i128 = Self::get_required(&env, &Amount)?;
 
         let token_client = token::Client::new(&env, &token_contract);
         if token_client.balance(&buyer) < amount {
@@ -223,18 +215,10 @@ impl EscrowContract {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
 
-        let seller: Address = env
-            .storage()
-            .instance()
-            .get(&Seller)
-            .ok_or(EscrowError::NotInitialized)?;
+        let seller: Address = Self::get_required(&env, &Seller)?;
         seller.require_auth();
 
-        let state: EscrowState = env
-            .storage()
-            .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
+        let state: EscrowState = Self::get_required(&env, &State)?;
         if state != EscrowState::Funded {
             return Err(EscrowError::InvalidState);
         }
@@ -253,11 +237,7 @@ impl EscrowContract {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
 
-        let buyer: Address = env
-            .storage()
-            .instance()
-            .get(&Buyer)
-            .ok_or(EscrowError::NotInitialized)?;
+        let buyer: Address = Self::get_required(&env, &Buyer)?;
         buyer.require_auth();
 
         Self::release_to_seller(env)
@@ -310,23 +290,11 @@ impl EscrowContract {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
 
-        let buyer: Address = env
-            .storage()
-            .instance()
-            .get(&Buyer)
-            .ok_or(EscrowError::NotInitialized)?;
+        let buyer: Address = Self::get_required(&env, &Buyer)?;
         buyer.require_auth();
 
-        let state: EscrowState = env
-            .storage()
-            .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
-        let deadline: u32 = env
-            .storage()
-            .instance()
-            .get(&Deadline)
-            .ok_or(EscrowError::NotInitialized)?;
+        let state: EscrowState = Self::get_required(&env, &State)?;
+        let deadline: u32 = Self::get_required(&env, &Deadline)?;
 
         let can_refund = matches!(state, EscrowState::Funded | EscrowState::Delivered)
             && env.ledger().sequence() > deadline;
@@ -342,27 +310,15 @@ impl EscrowContract {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
 
-        let buyer: Address = env
-            .storage()
-            .instance()
-            .get(&Buyer)
-            .ok_or(EscrowError::NotInitialized)?;
-        let seller: Address = env
-            .storage()
-            .instance()
-            .get(&Seller)
-            .ok_or(EscrowError::NotInitialized)?;
+        let buyer: Address = Self::get_required(&env, &Buyer)?;
+        let seller: Address = Self::get_required(&env, &Seller)?;
 
         if caller != buyer && caller != seller {
             return Err(EscrowError::NotAuthorized);
         }
         caller.require_auth();
 
-        let state: EscrowState = env
-            .storage()
-            .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
+        let state: EscrowState = Self::get_required(&env, &State)?;
         if !matches!(state, EscrowState::Funded | EscrowState::Delivered) {
             return Err(EscrowError::InvalidState);
         }
@@ -378,6 +334,10 @@ impl EscrowContract {
 
     /// Arbiter resolves a dispute.
     pub fn resolve_dispute(env: Env, release_to_seller: bool) -> Result<(), EscrowError> {
+        let arbiter: Address = Self::get_required(&env, &Arbiter)?;
+        arbiter.require_auth();
+
+        let state: EscrowState = Self::get_required(&env, &State)?;
         let state: EscrowState = env
             .storage()
             .instance()
@@ -465,18 +425,10 @@ impl EscrowContract {
 
     /// Buyer cancels an unfunded escrow (`Created` state only).
     pub fn cancel(env: Env) -> Result<(), EscrowError> {
-        let buyer: Address = env
-            .storage()
-            .instance()
-            .get(&Buyer)
-            .ok_or(EscrowError::NotInitialized)?;
+        let buyer: Address = Self::get_required(&env, &Buyer)?;
         buyer.require_auth();
 
-        let state: EscrowState = env
-            .storage()
-            .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
+        let state: EscrowState = Self::get_required(&env, &State)?;
         if state != EscrowState::Created {
             return Err(EscrowError::InvalidState);
         }
@@ -544,16 +496,16 @@ impl EscrowContract {
     }
 
     /// Return full escrow details as an [`EscrowInfo`] struct.
-    pub fn get_escrow_info(env: Env) -> EscrowInfo {
-        EscrowInfo {
-            buyer: env.storage().instance().get(&Buyer).unwrap(),
-            seller: env.storage().instance().get(&Seller).unwrap(),
-            arbiter: env.storage().instance().get(&Arbiter).unwrap(),
-            token_contract: env.storage().instance().get(&TokenContract).unwrap(),
-            amount: env.storage().instance().get(&Amount).unwrap(),
-            deadline: env.storage().instance().get(&Deadline).unwrap(),
-            state: env.storage().instance().get(&State).unwrap(),
-        }
+    pub fn get_escrow_info(env: Env) -> Result<EscrowInfo, EscrowError> {
+        Ok(EscrowInfo {
+            buyer: Self::get_required(&env, &Buyer)?,
+            seller: Self::get_required(&env, &Seller)?,
+            arbiter: Self::get_required(&env, &Arbiter)?,
+            token_contract: Self::get_required(&env, &TokenContract)?,
+            amount: Self::get_required(&env, &Amount)?,
+            deadline: Self::get_required(&env, &Deadline)?,
+            state: Self::get_required(&env, &State)?,
+        })
     }
 
     /// Return the current [`EscrowState`], or `None` if not initialized.
@@ -655,12 +607,20 @@ impl EscrowContract {
 }
 
 impl EscrowContract {
-    fn require_state(env: &Env, expected: EscrowState) -> Result<(), EscrowError> {
-        let state: EscrowState = env
-            .storage()
+    /// Helper to retrieve a required value from instance storage.
+    /// Returns `NotInitialized` error if the key is missing.
+    fn get_required<T: soroban_sdk::TryFromVal<soroban_sdk::Env, soroban_sdk::Val>>(
+        env: &Env,
+        key: &DataKey,
+    ) -> Result<T, EscrowError> {
+        env.storage()
             .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
+            .get(key)
+            .ok_or(EscrowError::NotInitialized)
+    }
+
+    fn require_state(env: &Env, expected: EscrowState) -> Result<(), EscrowError> {
+        let state: EscrowState = Self::get_required(env, &State)?;
         if state != expected {
             return Err(EscrowError::InvalidState);
         }
@@ -670,8 +630,8 @@ impl EscrowContract {
     fn release_to_seller(env: Env) -> Result<(), EscrowError> {
         Self::require_state(&env, EscrowState::Delivered)?;
 
-        let seller: Address = env.storage().instance().get(&Seller).unwrap();
-        let amount: i128 = env.storage().instance().get(&Amount).unwrap();
+        let seller: Address = Self::get_required(&env, &Seller)?;
+        let amount: i128 = Self::get_required(&env, &Amount)?;
 
         // checks-effects-interactions: update state before external call
         env.storage().instance().set(&State, &EscrowState::Completed);
@@ -688,8 +648,8 @@ impl EscrowContract {
     fn refund_to_buyer(env: Env) -> Result<(), EscrowError> {
         Self::require_state(&env, EscrowState::Funded)?;
 
-        let buyer: Address = env.storage().instance().get(&Buyer).unwrap();
-        let amount: i128 = env.storage().instance().get(&Amount).unwrap();
+        let buyer: Address = Self::get_required(&env, &Buyer)?;
+        let amount: i128 = Self::get_required(&env, &Amount)?;
 
         // checks-effects-interactions: update state before external call
         env.storage().instance().set(&State, &EscrowState::Refunded);
