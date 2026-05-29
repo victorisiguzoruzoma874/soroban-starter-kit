@@ -1,0 +1,50 @@
+use soroban_sdk::{contracttype, Address};
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    Admin,
+    /// Instance storage – pending admin address for two-step admin transfer.
+    PendingAdmin,
+    /// Persistent storage – token balance (`i128`) for a given [`Address`].
+    Balance(Address),
+    Allowance(AllowanceDataKey),
+    Metadata(MetadataKey),
+    TotalSupply,
+    /// Instance storage – whether the contract is paused (`bool`).
+    Paused,
+    /// Instance storage – maximum tokens that may ever be minted (`i128`).
+    MaxSupply,
+    /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
+    PendingUpgrade,
+    /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, `ready_after_ledger`).
+    PendingUpgrade,
+    /// Instance storage – pending WASM upgrade: `(BytesN<32>, u32)` = (hash, ready_after_ledger).
+    PendingUpgrade,
+    /// Instance storage – contract version number (`u32`).
+    Version,
+    /// Instance storage – frozen accounts set (`bool` per address).
+    Frozen(Address),
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct AllowanceDataKey {
+    pub from: Address,
+    pub spender: Address,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub struct AllowanceValue {
+    pub amount: i128,
+    pub expiration_ledger: u32,
+}
+
+#[contracttype]
+#[derive(Clone)]
+pub enum MetadataKey {
+    Name,
+    Symbol,
+    Decimals,
+}

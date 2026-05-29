@@ -1,17 +1,20 @@
 # Soroban Contract Templates
 
+[![CI](https://github.com/Fidelis900/soroban-starter-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/Fidelis900/soroban-starter-kit/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Fidelis900/soroban-starter-kit/branch/main/graph/badge.svg)](https://codecov.io/gh/Fidelis900/soroban-starter-kit)
+
 A curated collection of production-ready Soroban smart contract templates. These templates help developers quickly bootstrap common use cases on Soroban (Stellar's smart contract platform) for DeFi, payments, governance, and more.
 
 ## 🚀 Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/Fidelis900/soroban-starter-kit.git
-cd soroban-starter-kit
+git clone https://github.com/your-username/soroban-contract-templates.git
+cd soroban-contract-templates
 
-# Build a contract (example: token)
-cd contracts/token
-soroban contract build
+# Build a contract from the repo root (example: token)
+stellar contract build --manifest-path contracts/token/Cargo.toml
+# Alternatively: cd contracts/token && stellar contract build
 
 # Deploy to testnet
 ./scripts/deploy.sh testnet
@@ -61,7 +64,7 @@ Each template includes:
 
 ```bash
 cd contracts/[template-name]
-soroban contract build
+stellar contract build
 ```
 
 ### Running Tests
@@ -86,13 +89,37 @@ Start a local Stellar node with Soroban RPC:
 docker compose up stellar-node
 ```
 
+## ⚠️ Error Reference
+
+### Token Contract Errors (`TokenError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `InsufficientBalance` | Caller's balance is too low to complete the transfer or burn |
+| 2 | `InsufficientAllowance` | Approved allowance is too low for the requested `transfer_from` amount |
+| 3 | `Unauthorized` | Caller is not the admin or does not have permission for this operation |
+| 4 | `AlreadyInitialized` | `initialize` was called on a contract that has already been set up |
+| 5 | `NotInitialized` | An operation was attempted before the contract was initialized |
+| 6 | `InvalidAmount` | Amount is zero, negative, or exceeds the configured max supply |
+| 7 | `Overflow` | Arithmetic overflow occurred during a balance or supply calculation |
+
+### Escrow Contract Errors (`EscrowError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `NotAuthorized` | Caller is not permitted to invoke this function (wrong party or arbiter) |
+| 2 | `InvalidState` | The escrow is not in the required state for this operation |
+| 3 | `DeadlinePassed` | The escrow deadline has already elapsed; the operation is no longer valid |
+| 4 | `DeadlineNotReached` | The deadline has not yet passed; premature refund or timeout claim attempted |
+| 5 | `AlreadyInitialized` | `initialize` was called on an escrow that is already set up |
+| 6 | `NotInitialized` | An operation was attempted before the escrow was initialized |
+| 7 | `InsufficientFunds` | The buyer's token balance is too low to cover the escrowed amount |
+| 8 | `InvalidAmount` | The specified amount is zero or otherwise invalid |
+| 9 | `InvalidParties` | Buyer, seller, or arbiter addresses are invalid or conflict with each other |
+
 ## 🤝 Contributing
 
-We welcome contributions! Please:
-- Add new contract templates following the existing structure
-- Include comprehensive tests for all functionality
-- Provide clear documentation and usage examples
-- Follow Rust and Soroban best practices
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, test commands, code style, and the PR process.
 
 ## 📚 Resources
 
@@ -101,6 +128,7 @@ We welcome contributions! Please:
 - [Soroban Examples](https://github.com/stellar/soroban-examples)
 - [Freighter Wallet](https://freighter.app/)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
+- [Security Best Practices](docs/security.md)
 
 ## 📄 License
 

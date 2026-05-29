@@ -1,15 +1,32 @@
 [workspace]
-members = [
-    "contracts/token",
-    "contracts/escrow",
-]
+members = ["contracts/common", "contracts/token", "contracts/escrow", "tests", "fuzz"]
 resolver = "2"
 
 [workspace.dependencies]
-soroban-sdk = "21"
+soroban-sdk = "=21.7.7"
+soroban-common = { path = "contracts/common", version = "0.1.0" }
+serde = "=1.0.228"
+proc-macro2 = "=1.0.106"
+quote = "=1.0.45"
+soroban-sdk-testutils = { version = "=21.7.7", package = "soroban-sdk", features = ["testutils"] }
+proptest = "=1.6.0"
 
-[workspace.metadata]
-name = "soroban-contract-templates"
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+lto = true
+codegen-units = 1
+
+[workspace.package]
 description = "Production-ready Soroban smart contract templates"
 authors = ["Soroban Templates Contributors"]
 license = "Apache-2.0"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unused_imports = "warn"
+unused_variables = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"

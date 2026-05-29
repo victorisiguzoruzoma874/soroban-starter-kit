@@ -13,16 +13,19 @@ echo "🚀 Deploying Escrow Contract to $NETWORK..."
 
 # Build the contract
 echo "📦 Building contract..."
-soroban contract build
+stellar contract build
 
 # Deploy the contract
 echo "🌐 Deploying to $NETWORK..."
-CONTRACT_ID=$(soroban contract deploy \
+CONTRACT_ID=$(stellar contract deploy \
     --wasm target/wasm32-unknown-unknown/release/${CONTRACT_NAME}.wasm \
     --network $NETWORK)
 
 echo "✅ Escrow contract deployed!"
 echo "📋 Contract ID: $CONTRACT_ID"
+
+# Save contract ID
+echo "escrow: $CONTRACT_ID" >> ../../../.contract-ids
 
 # Example initialization (uncomment to use)
 # echo "🔧 Initializing escrow..."
@@ -33,7 +36,7 @@ echo "📋 Contract ID: $CONTRACT_ID"
 # AMOUNT=1000000000000000000000  # 1000 tokens with 18 decimals
 # DEADLINE=$(($(date +%s) + 86400))  # 24 hours from now
 
-# soroban contract invoke \
+# stellar contract invoke \
 #     --id $CONTRACT_ID \
 #     --network $NETWORK \
 #     -- initialize \

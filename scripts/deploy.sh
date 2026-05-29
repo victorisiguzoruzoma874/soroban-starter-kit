@@ -3,24 +3,38 @@
 # Usage: ./scripts/deploy.sh [testnet|mainnet|local] [contract]
 set -euo pipefail
 
+check_prerequisites() {
+  local missing=()
+  for cmd in stellar cargo; do
+    command -v "$cmd" &>/dev/null || missing+=("$cmd")
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "Missing required tools: ${missing[*]}" >&2
+    exit 1
+  fi
+}
+check_prerequisites
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACTS_DIR="$ROOT/contracts"
+
+[[ -d "$CONTRACTS_DIR" ]] || { echo "Contracts directory not found: $CONTRACTS_DIR"; exit 1; }
 
 NETWORK="${1:-testnet}"
 CONTRACT="${2:-all}"
 
 case "$NETWORK" in
   testnet)
-    RPC_URL="https://soroban-testnet.stellar.org"
-    PASSPHRASE="Test SDF Network ; September 2015"
+    RPC_URL="${STELLAR_RPC_URL:-https://soroban-testnet.stellar.org}"
+    PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}"
     ;;
   mainnet)
-    RPC_URL="https://soroban.stellar.org"
-    PASSPHRASE="Public Global Stellar Network ; September 2015"
+    RPC_URL="${STELLAR_RPC_URL:-https://soroban.stellar.org}"
+    PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Public Global Stellar Network ; September 2015}"
     ;;
   local)
-    RPC_URL="http://localhost:${LOCAL_RPC_PORT:-8000}"
-    PASSPHRASE="Standalone Network ; February 2017"
+    RPC_URL="${STELLAR_RPC_URL:-http://localhost:${LOCAL_RPC_PORT:-8000}}"
+    PASSPHRASE="${STELLAR_NETWORK_PASSPHRASE:-Standalone Network ; February 2017}"
     ;;
   *)
     echo "Unknown network: $NETWORK (use testnet|mainnet|local)" >&2
@@ -40,12 +54,14 @@ deploy_contract() {
   [[ -n "$WASM" ]] || { echo "No WASM found for $name"; return 1; }
 
   echo "── Deploying $name to $NETWORK ──"
-  stellar contract deploy \
+  CONTRACT_ID=$(stellar contract deploy \
     --wasm "$WASM" \
     --rpc-url "$RPC_URL" \
     --network-passphrase "$PASSPHRASE" \
     --source-account default \
-    --network "$NETWORK"
+    --network "$NETWORK")
+  echo "$name: $CONTRACT_ID" >> "$ROOT/.contract-ids"
+  echo "Contract ID: $CONTRACT_ID"
 }
 
 if [[ "$CONTRACT" == "all" ]]; then

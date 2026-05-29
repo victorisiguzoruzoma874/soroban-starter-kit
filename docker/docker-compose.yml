@@ -8,21 +8,37 @@ services:
       - "3000:3000"
     volumes:
       - ..:/app
+      - /app/node_modules # keep container node_modules isolated
       - /app/node_modules          # keep container node_modules isolated
+      - /app/target                # exclude Rust build artifacts
+      - /app/.git                  # exclude git metadata
     env_file: ../.env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     depends_on:
-      - stellar-node
+      stellar-node:
+        condition: service_healthy
 
   contracts:
     build:
       context: ..
       dockerfile: docker/Dockerfile.contracts
+      target: builder
+    command: >
+      sh -c "for dir in contracts/*/; do
+        [ -f \"$$dir/Cargo.toml\" ] && stellar contract build --manifest-path \"$$dir/Cargo.toml\";
+      done"
     volumes:
       - ../contracts:/contracts
       - cargo-cache:/usr/local/cargo/registry
     env_file: ../.env
+    restart: "no"
     depends_on:
-      - stellar-node
+      stellar-node:
+        condition: service_healthy
 
   # Local Stellar / Soroban node (stellar/quickstart)
   stellar-node:
@@ -34,10 +50,13 @@ services:
     environment:
       - ENABLE_SOROBAN_RPC=true
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/" ]
       interval: 10s
       timeout: 5s
       retries: 10
+
+# To clean the cargo-cache volume (which can grow to several GB), run:
+# docker volume rm soroban-starter-kit_cargo-cache
 
 volumes:
   cargo-cache:
