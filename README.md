@@ -91,6 +91,8 @@ docker compose up stellar-node
 
 ## ⚠️ Error Reference
 
+> For full details — causes, triggers, and resolution steps — see [docs/error-reference.md](docs/error-reference.md).
+
 ### Token Contract Errors (`TokenError`)
 
 | Code | Name | Description |
