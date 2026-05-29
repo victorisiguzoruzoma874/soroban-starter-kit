@@ -26,6 +26,7 @@ proptest = { workspace = true }
 [[bin]]
 name = "deploy"
 path = "src/bin/deploy.rs"
+doc = false
 
 [lints]
 workspace = true
