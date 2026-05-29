@@ -20,10 +20,6 @@ pub enum DataKey {
     Deadline,
     /// Current [`EscrowState`] of the escrow lifecycle.
     State,
-    /// `true` once the buyer has approved delivery (`bool`).
-    BuyerApproved,
-    /// `true` once the seller has marked goods/services as delivered (`bool`).
-    SellerDelivered,
     /// Whether the contract is paused (`bool`).
     Paused,
     /// Contract version number (`u32`).

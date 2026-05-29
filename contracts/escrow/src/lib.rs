@@ -74,8 +74,6 @@ impl EscrowContract {
         env.storage().instance().set(&Amount, &amount);
         env.storage().instance().set(&Deadline, &deadline_ledger);
         env.storage().instance().set(&State, &EscrowState::Created);
-        env.storage().instance().set(&BuyerApproved, &false);
-        env.storage().instance().set(&SellerDelivered, &false);
 
         bump_instance(&env);
 
@@ -145,7 +143,6 @@ impl EscrowContract {
             return Err(EscrowError::InvalidState);
         }
 
-        env.storage().instance().set(&SellerDelivered, &true);
         env.storage().instance().set(&State, &EscrowState::Delivered);
         bump_instance(&env);
 
