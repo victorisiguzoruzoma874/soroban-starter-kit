@@ -11,6 +11,7 @@ pub use errors::EscrowError;
 pub use storage::{DataKey, EscrowInfo, EscrowState};
 
 use admin::require_admin;
+use soroban_common::MIN_DEADLINE_BUFFER;
 use storage::DataKey::*;
 
 /// Extend storage TTL when remaining ledgers fall below this threshold.
@@ -18,9 +19,6 @@ const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
 
 /// Target TTL (in ledgers) after each extension.
 const LEDGER_BUMP_AMOUNT: u32 = 518_400;
-
-/// Minimum number of ledgers the deadline must be in the future.
-const MIN_DEADLINE_BUFFER: u32 = 10;
 
 fn bump_instance(env: &Env) {
     env.storage()
