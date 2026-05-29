@@ -1,9 +1,8 @@
 #![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, token, Address, Env, String,
+    contract, contractimpl, panic_with_error, token::{self, TokenInterface}, Address, Env, String,
 };
-use token::TokenInterface as _;
 
 mod admin;
 mod errors;
