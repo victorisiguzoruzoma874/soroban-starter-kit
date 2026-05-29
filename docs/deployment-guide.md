@@ -87,6 +87,32 @@ Save the contract IDs printed to stdout — you'll need them in `.env`.
 
 ---
 
+## 3b. Post-Deploy Initialization
+
+After deploying contracts, run the initialization script to call each contract's `initialize` function:
+
+```bash
+# Populate .contract-ids with deployed IDs (one per line: name=CONTRACT_ID)
+echo "token=CABC..." >> .contract-ids
+echo "escrow=CDEF..." >> .contract-ids
+
+# Initialize all contracts on the current network
+./scripts/initialize.sh testnet   # or local / mainnet
+```
+
+**Environment variable overrides:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INIT_FN` | `initialize` | Function name to invoke |
+| `SOURCE_ACCOUNT` | `default` | Stellar key to sign transactions |
+| `CONTRACT_IDS_FILE` | `.contract-ids` | Path to contract ID list |
+| `INIT_ARGS_<NAME>` | _(none)_ | Extra CLI args for a specific contract, e.g. `INIT_ARGS_TOKEN="--admin GABC..."` |
+
+The script is idempotent: contracts that return an "already initialized" error are reported as skipped rather than failures.
+
+---
+
 ## 4. Mainnet Deployment
 
 > ⚠️ Mainnet deployments are irreversible. Complete testnet validation first.
