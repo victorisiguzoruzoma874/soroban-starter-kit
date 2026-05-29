@@ -45,6 +45,19 @@ fn require_not_paused(env: &Env) -> Result<(), TokenError> {
     Ok(())
 }
 
+#[cfg(feature = "freeze")]
+fn require_not_frozen(env: &Env, account: &Address) -> Result<(), TokenError> {
+    if env
+        .storage()
+        .instance()
+        .get(&DataKey::Frozen(account.clone()))
+        .unwrap_or(false)
+    {
+        return Err(TokenError::Unauthorized);
+    }
+    Ok(())
+}
+
 #[contract]
 pub struct TokenContract;
 
@@ -76,6 +89,7 @@ impl TokenContract {
             .instance()
             .set(&DataKey::Metadata(MetadataKey::Decimals), &decimals);
         env.storage().instance().set(&DataKey::TotalSupply, &0i128);
+        env.storage().instance().set(&DataKey::Version, &1u32);
         #[cfg(feature = "capped-supply")]
         if let Some(cap) = max_supply {
             if cap <= 0 {
@@ -260,6 +274,14 @@ impl TokenContract {
     pub fn version(env: Env) -> String {
         String::from_str(&env, env!("GIT_HASH"))
     }
+
+    /// Return the on-chain contract version number.
+    pub fn contract_version(env: Env) -> u32 {
+        env.storage()
+            .instance()
+            .get(&DataKey::Version)
+            .unwrap_or(0)
+    }
 }
 
 /// Pause / unpause — only compiled when the `pausable` feature is enabled.
@@ -283,6 +305,37 @@ impl TokenContract {
         env.storage().instance().set(&DataKey::Paused, &false);
         bump_instance(&env);
         events::unpaused(&env, &admin);
+        Ok(())
+    }
+}
+
+/// Account freeze — only compiled when the `freeze` feature is enabled.
+#[cfg(feature = "freeze")]
+#[contractimpl]
+impl TokenContract {
+    /// Freeze an account, preventing transfers and burns. Admin only.
+    pub fn freeze_account(env: Env, account: Address) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Frozen(account.clone()), &true);
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "account_frozen"), account),
+            (),
+        );
+        Ok(())
+    }
+
+    /// Unfreeze an account, allowing transfers and burns. Admin only.
+    pub fn unfreeze_account(env: Env, account: Address) -> Result<(), TokenError> {
+        let admin = require_admin(&env)?;
+        admin.require_auth();
+        env.storage().instance().set(&DataKey::Frozen(account.clone()), &false);
+        bump_instance(&env);
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "account_unfrozen"), account),
+            (),
+        );
         Ok(())
     }
 }
@@ -319,8 +372,6 @@ impl TokenContract {
     pub fn execute_upgrade(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
-        events::upgraded(&env, &admin, &new_wasm_hash);
-        env.deployer().update_current_contract_wasm(new_wasm_hash);
         let (wasm_hash, ready_after): (soroban_sdk::BytesN<32>, u32) = env
             .storage()
             .instance()
@@ -330,6 +381,16 @@ impl TokenContract {
             return Err(TokenError::Unauthorized);
         }
         env.storage().instance().remove(&DataKey::PendingUpgrade);
+        let current_version: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::Version)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::Version, &(current_version + 1));
+        bump_instance(&env);
+        events::upgraded(&env, &admin, &wasm_hash);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "upgrade_executed"), admin),
             wasm_hash.clone(),
@@ -405,6 +466,10 @@ impl token::TokenInterface for TokenContract {
         if let Err(e) = require_not_paused(&env) {
             panic_with_error!(&env, e);
         }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
+            panic_with_error!(&env, e);
+        }
         if let Err(e) = Self::transfer_impl(&env, from, to, amount) {
             panic_with_error!(&env, e);
         }
@@ -414,6 +479,10 @@ impl token::TokenInterface for TokenContract {
         spender.require_auth();
         #[cfg(feature = "pausable")]
         if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
             panic_with_error!(&env, e);
         }
         let key = DataKey::Allowance(AllowanceDataKey {
@@ -444,6 +513,10 @@ impl token::TokenInterface for TokenContract {
         from.require_auth();
         #[cfg(feature = "pausable")]
         if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
             panic_with_error!(&env, e);
         }
         if amount <= 0 {
@@ -481,6 +554,10 @@ impl token::TokenInterface for TokenContract {
         spender.require_auth();
         #[cfg(feature = "pausable")]
         if let Err(e) = require_not_paused(&env) {
+            panic_with_error!(&env, e);
+        }
+        #[cfg(feature = "freeze")]
+        if let Err(e) = require_not_frozen(&env, &from) {
             panic_with_error!(&env, e);
         }
         let key = DataKey::Allowance(AllowanceDataKey {
