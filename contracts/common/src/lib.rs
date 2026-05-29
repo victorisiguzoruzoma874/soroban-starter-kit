@@ -13,7 +13,12 @@ pub const MIN_DEADLINE_BUFFER: u32 = 10;
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
+/// use soroban_sdk::{Env, Address};
+/// use soroban_common::AdminKey;
+///
+/// let env = Env::default();
+/// let admin_address = Address::generate(&env);
 /// env.storage().instance().set(&AdminKey::Admin, &admin_address);
 /// ```
 #[contracttype]
@@ -30,8 +35,16 @@ pub enum AdminKey {
 ///
 /// # Examples
 ///
-/// ```ignore
-/// let admin: Address = soroban_common::get_admin(&env);
+/// ```
+/// use soroban_sdk::{Env, Address};
+/// use soroban_common::{AdminKey, get_admin};
+///
+/// let env = Env::default();
+/// let admin_address = Address::generate(&env);
+/// env.storage().instance().set(&AdminKey::Admin, &admin_address);
+///
+/// let admin: Address = get_admin(&env);
+/// assert_eq!(admin, admin_address);
 /// ```
 #[must_use]
 pub fn get_admin(env: &Env) -> Address {
@@ -45,10 +58,19 @@ pub fn get_admin(env: &Env) -> Address {
 ///
 /// # Examples
 ///
-/// ```ignore
-/// if let Some(admin) = soroban_common::try_get_admin(&env) {
-///     // admin is set
-/// }
+/// ```
+/// use soroban_sdk::{Env, Address};
+/// use soroban_common::{AdminKey, try_get_admin};
+///
+/// let env = Env::default();
+///
+/// // Before setting admin
+/// assert_eq!(try_get_admin(&env), None);
+///
+/// // After setting admin
+/// let admin_address = Address::generate(&env);
+/// env.storage().instance().set(&AdminKey::Admin, &admin_address);
+/// assert_eq!(try_get_admin(&env), Some(admin_address));
 /// ```
 #[must_use]
 pub fn try_get_admin(env: &Env) -> Option<Address> {
@@ -63,8 +85,22 @@ pub fn try_get_admin(env: &Env) -> Option<Address> {
 ///
 /// # Examples
 ///
-/// ```ignore
-/// let amount: i128 = soroban_common::get_instance(&env, &DataKey::Amount);
+/// ```
+/// use soroban_sdk::{contracttype, Env};
+/// use soroban_common::get_instance;
+///
+/// #[contracttype]
+/// #[derive(Clone)]
+/// enum DataKey {
+///     Amount,
+/// }
+///
+/// let env = Env::default();
+/// let amount: i128 = 1000;
+/// env.storage().instance().set(&DataKey::Amount, &amount);
+///
+/// let retrieved: i128 = get_instance(&env, &DataKey::Amount);
+/// assert_eq!(retrieved, 1000);
 /// ```
 pub fn get_instance<K, V>(env: &Env, key: &K) -> V
 where
@@ -80,9 +116,13 @@ where
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
+/// use soroban_sdk::Env;
+/// use soroban_common::extend_ttl_instance;
+///
+/// let env = Env::default();
 /// // Keep instance storage alive for ~30 days if TTL drops below ~7 days.
-/// soroban_common::extend_ttl_instance(&env, 120_960, 518_400);
+/// extend_ttl_instance(&env, 120_960, 518_400);
 /// ```
 pub fn extend_ttl_instance(env: &Env, threshold: u32, extend_to: u32) {
     env.storage()
@@ -95,8 +135,19 @@ pub fn extend_ttl_instance(env: &Env, threshold: u32, extend_to: u32) {
 ///
 /// # Examples
 ///
-/// ```ignore
-/// soroban_common::extend_ttl_persistent(&env, &DataKey::Balance(addr), 120_960, 518_400);
+/// ```
+/// use soroban_sdk::{contracttype, Env, Address};
+/// use soroban_common::extend_ttl_persistent;
+///
+/// #[contracttype]
+/// #[derive(Clone)]
+/// enum DataKey {
+///     Balance(Address),
+/// }
+///
+/// let env = Env::default();
+/// let addr = Address::generate(&env);
+/// extend_ttl_persistent(&env, &DataKey::Balance(addr), 120_960, 518_400);
 /// ```
 pub fn extend_ttl_persistent<K>(env: &Env, key: &K, threshold: u32, extend_to: u32)
 where
