@@ -29,6 +29,7 @@ cargo test
 |----------|-------------|-----------|---------|
 | **Token** | Custom fungible token with mint/burn/admin controls | DeFi tokens, governance tokens, utility tokens | ✅ Complete |
 | **Escrow** | Two-party escrow with timeout and refund mechanism | P2P trading, service payments, milestone payments | ✅ Complete |
+| **Vesting** | Token vesting with cliff + linear release schedule | Team allocations, investor lockups, employee grants | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -45,6 +46,14 @@ cargo test
 - **State Management**: Clear transaction lifecycle
 - **Token Agnostic**: Works with any Soroban token
 - **Event Emission**: All operations emit events for tracking
+
+### Vesting Contract Features
+- **Cliff + Linear Schedule**: Tokens unlock linearly between `cliff_ledger` and `end_ledger`
+- **Admin Revocation**: Admin can cancel unvested tokens at any time; vested tokens remain claimable
+- **Incremental Claims**: Beneficiary claims accrued tokens on demand
+- **Token Agnostic**: Works with any Soroban-compatible token
+- **Event Emission**: `initialized`, `claimed`, and `revoked` events for off-chain tracking
+- **TTL Management**: Instance storage TTL is extended on every interaction
 
 Each template includes:
 - ✅ Complete contract implementation
@@ -116,6 +125,18 @@ docker compose up stellar-node
 | 7 | `InsufficientFunds` | The buyer's token balance is too low to cover the escrowed amount |
 | 8 | `InvalidAmount` | The specified amount is zero or otherwise invalid |
 | 9 | `InvalidParties` | Buyer, seller, or arbiter addresses are invalid or conflict with each other |
+
+### Vesting Contract Errors (`VestingError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `AlreadyInitialized` | `initialize` was called on a contract that is already set up |
+| 2 | `NotInitialized` | An operation was attempted before the contract was initialized |
+| 3 | `Unauthorized` | Caller is not the admin |
+| 4 | `InvalidAmount` | The vesting amount is zero or negative |
+| 5 | `InvalidSchedule` | `cliff_ledger` >= `end_ledger`, or `end_ledger` is in the past |
+| 6 | `NothingToClaim` | No tokens have vested since the last claim (or vested amount is zero) |
+| 7 | `AlreadyRevoked` | `revoke` was called on a schedule that has already been revoked |
 
 ## 🤝 Contributing
 
