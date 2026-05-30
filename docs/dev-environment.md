@@ -8,6 +8,24 @@
 | Docker | 24+ | https://docs.docker.com/get-docker/ |
 | Rust | 1.78+ | https://rustup.rs |
 | Stellar CLI | latest | `cargo install --locked stellar-cli --features opt` |
+| just (optional) | latest | `cargo install just` |
+
+### Installing `just`
+
+`just` is a command runner popular in the Rust ecosystem with better cross-platform support than `make`:
+
+```bash
+# Via cargo (all platforms)
+cargo install just
+
+# Via homebrew (macOS/Linux)
+brew install just
+
+# Via winget (Windows)
+winget install Casey.Just
+```
+
+Run `just --list` from the project root to see all available recipes.
 
 ---
 
