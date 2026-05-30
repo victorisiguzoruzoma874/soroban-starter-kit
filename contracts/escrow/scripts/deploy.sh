@@ -24,8 +24,21 @@ CONTRACT_ID=$(stellar contract deploy \
 echo "✅ Escrow contract deployed!"
 echo "📋 Contract ID: $CONTRACT_ID"
 
-# Save contract ID
-echo "escrow: $CONTRACT_ID" >> ../../../.contract-ids
+# Save contract ID in JSON format
+CONTRACT_IDS_FILE="../../../.contract-ids"
+if [ ! -f "$CONTRACT_IDS_FILE" ]; then
+    # Create new file with JSON structure
+    echo "{\"network\": \"$NETWORK\", \"contracts\": {\"escrow\": \"$CONTRACT_ID\"}}" > "$CONTRACT_IDS_FILE"
+else
+    # Update existing JSON file
+    # Use a temporary file for the update
+    TEMP_FILE="${CONTRACT_IDS_FILE}.tmp"
+    # Update network and add/update escrow contract ID
+    jq --arg network "$NETWORK" --arg contract_id "$CONTRACT_ID" \
+        '.network = $network | .contracts.escrow = $contract_id' \
+        "$CONTRACT_IDS_FILE" > "$TEMP_FILE"
+    mv "$TEMP_FILE" "$CONTRACT_IDS_FILE"
+fi
 
 # Example initialization (uncomment to use)
 # echo "🔧 Initializing escrow..."

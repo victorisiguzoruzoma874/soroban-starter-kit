@@ -151,6 +151,8 @@ jobs:
 
   security-audit:
     name: Security Audit
+  machete:
+    name: Unused dependencies (cargo-machete)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -161,6 +163,29 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Install cargo-machete
+        run: cargo install cargo-machete --locked
+
+      - name: Check for unused dependencies
+        run: cargo machete --workspace
+
+  udeps:
+    name: Unused dev-dependencies (cargo-udeps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-udeps
+        run: cargo install cargo-udeps --locked
+
+      - name: Check for unused dev-dependencies
+        run: cargo +nightly udeps --workspace --all-targets
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
 
