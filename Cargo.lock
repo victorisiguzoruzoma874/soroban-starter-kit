@@ -1481,6 +1481,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-staking-template"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-token-fuzz"
 version = "0.1.0"
 dependencies = [
@@ -1491,6 +1500,15 @@ dependencies = [
 
 [[package]]
 name = "soroban-token-template"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "soroban-vesting-template"
 version = "0.1.0"
 dependencies = [
  "proptest",

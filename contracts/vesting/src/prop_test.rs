@@ -1,0 +1,95 @@
+#![cfg(test)]
+
+use proptest::prelude::*;
+use soroban_sdk::{testutils::Ledger as _, Env};
+
+use crate::{VestingContract, VestingContractClient};
+use super::{make_token, setup_env};
+use soroban_sdk::testutils::Address as _;
+use soroban_sdk::Address;
+
+fn prop_setup(env: &Env, amount: i128) -> (VestingContractClient, Address, Address, Address, u32, u32) {
+    let admin = Address::generate(env);
+    let beneficiary = Address::generate(env);
+    let token = make_token(env, &admin, amount);
+    let cliff = env.ledger().sequence() + 10;
+    let end = cliff + 100;
+    let addr = env.register_contract(None, VestingContract);
+    let client = VestingContractClient::new(env, &addr);
+    client.initialize(&admin, &beneficiary, &token, &cliff, &end, &amount);
+    (client, admin, beneficiary, token, cliff, end)
+}
+
+proptest! {
+    #[test]
+    fn prop_initialize_stores_amount(amount in 1i128..=1_000_000i128) {
+        let env = setup_env();
+        let (client, ..) = prop_setup(&env, amount);
+        let info = client.get_info().unwrap();
+        assert_eq!(info.amount, amount);
+        assert_eq!(info.claimed, 0);
+        assert!(!info.revoked);
+    }
+
+    #[test]
+    fn prop_claim_after_end_yields_full(amount in 1i128..=1_000_000i128) {
+        let env = setup_env();
+        let (client, _admin, beneficiary, token, _cliff, end) = prop_setup(&env, amount);
+        env.ledger().with_mut(|l| l.sequence_number = end + 1);
+        let claimed = client.claim();
+        assert_eq!(claimed, amount);
+        let token_client = soroban_sdk::token::Client::new(&env, &token);
+        assert_eq!(token_client.balance(&beneficiary), amount);
+    }
+
+    #[test]
+    fn prop_revoke_before_cliff_returns_all(amount in 1i128..=1_000_000i128) {
+        let env = setup_env();
+        let (client, admin, _beneficiary, token, _cliff, _end) = prop_setup(&env, amount);
+        let returned = client.revoke();
+        assert_eq!(returned, amount);
+        let token_client = soroban_sdk::token::Client::new(&env, &token);
+        assert_eq!(token_client.balance(&admin), amount);
+    }
+
+    #[test]
+    fn prop_revoke_plus_claim_equals_total(
+        amount in 2i128..=1_000_000i128,
+        pct in 0u32..=100u32,
+    ) {
+        let env = setup_env();
+        let (client, _admin, _beneficiary, _token, cliff, end) = prop_setup(&env, amount);
+        let ledger = cliff + (end - cliff) * pct / 100;
+        env.ledger().with_mut(|l| l.sequence_number = ledger);
+        let returned = client.revoke();
+        let claimed = client.try_claim().unwrap_or(Ok(0)).unwrap_or(0);
+        assert_eq!(returned + claimed, amount);
+    }
+
+    #[test]
+    fn prop_claimable_monotone(
+        amount in 1i128..=1_000_000i128,
+        t1_pct in 0u32..=100u32,
+        t2_pct in 0u32..=100u32,
+    ) {
+        let env = setup_env();
+        let (client, ..) = prop_setup(&env, amount);
+        let info = client.get_info().unwrap();
+        let cliff = info.cliff_ledger;
+        let end = info.end_ledger;
+
+        let l1 = cliff + (end - cliff) * t1_pct / 100;
+        let l2 = cliff + (end - cliff) * t2_pct / 100;
+
+        env.ledger().with_mut(|l| l.sequence_number = l1);
+        let c1 = client.claimable();
+        env.ledger().with_mut(|l| l.sequence_number = l2);
+        let c2 = client.claimable();
+
+        if l2 >= l1 {
+            assert!(c2 >= c1);
+        } else {
+            assert!(c2 <= c1);
+        }
+    }
+}

@@ -29,6 +29,8 @@ cargo test
 |----------|-------------|-----------|---------|
 | **Token** | Custom fungible token with mint/burn/admin controls | DeFi tokens, governance tokens, utility tokens | ✅ Complete |
 | **Escrow** | Two-party escrow with timeout and refund mechanism | P2P trading, service payments, milestone payments | ✅ Complete |
+| **Vesting** | Token vesting with cliff + linear release schedule | Team allocations, investor lockups, employee grants | ✅ Complete |
+| **Staking** | Token staking with proportional reward distribution | DeFi yield, protocol incentives, liquidity mining | ✅ Complete |
 | **Multisig** | N-of-M wallet for threshold-approved contract calls | DAO treasuries, team wallets, shared administration | ✅ Complete |
 
 ### Token Contract Features
@@ -47,6 +49,23 @@ cargo test
 - **Token Agnostic**: Works with any Soroban token
 - **Event Emission**: All operations emit events for tracking
 
+### Vesting Contract Features
+- **Cliff + Linear Schedule**: Tokens unlock linearly between `cliff_ledger` and `end_ledger`
+- **Admin Revocation**: Admin can cancel unvested tokens at any time; vested tokens remain claimable
+- **Incremental Claims**: Beneficiary claims accrued tokens on demand
+- **Token Agnostic**: Works with any Soroban-compatible token
+- **Event Emission**: `initialized`, `claimed`, and `revoked` events for off-chain tracking
+- **TTL Management**: Instance storage TTL is extended on every interaction
+
+### Staking Contract Features
+- **Proportional Rewards**: Rewards distributed pro-rata to each staker's share of the pool
+- **Reward-Per-Token Accumulator**: Gas-efficient global accumulator pattern; no per-staker loops
+- **Separate Stake / Reward Tokens**: Stake token and reward token can be the same or different
+- **Admin Reward Deposits**: Admin calls `add_rewards` to top up the reward pool at any time
+- **Incremental Claims**: Stakers call `claim_rewards` independently; rewards accrue continuously
+- **Token Agnostic**: Works with any Soroban-compatible token
+- **Event Emission**: `staked`, `unstaked`, `rewards_claimed`, and `rewards_added` events
+- **TTL Management**: Instance storage TTL is extended on every interaction
 ### Multisig Contract Features
 - **N-of-M Authorization**: Configure any valid threshold across unique signers
 - **Signer Management**: Add or remove signers with threshold-approved changes
@@ -130,6 +149,29 @@ docker compose up stellar-node
 | 8 | `InvalidAmount` | The specified amount is zero or otherwise invalid |
 | 9 | `InvalidParties` | Buyer, seller, or arbiter addresses are invalid or conflict with each other |
 
+### Vesting Contract Errors (`VestingError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `AlreadyInitialized` | `initialize` was called on a contract that is already set up |
+| 2 | `NotInitialized` | An operation was attempted before the contract was initialized |
+| 3 | `Unauthorized` | Caller is not the admin |
+| 4 | `InvalidAmount` | The vesting amount is zero or negative |
+| 5 | `InvalidSchedule` | `cliff_ledger` >= `end_ledger`, or `end_ledger` is in the past |
+| 6 | `NothingToClaim` | No tokens have vested since the last claim (or vested amount is zero) |
+| 7 | `AlreadyRevoked` | `revoke` was called on a schedule that has already been revoked |
+
+### Staking Contract Errors (`StakingError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `AlreadyInitialized` | `initialize` was called on a contract that is already set up |
+| 2 | `NotInitialized` | An operation was attempted before the contract was initialized |
+| 3 | `Unauthorized` | Caller is not the admin |
+| 4 | `InvalidAmount` | Amount is zero or negative |
+| 5 | `NoStake` | Staker has no stake to unstake or claim from |
+| 6 | `InsufficientStake` | Requested unstake amount exceeds the staker's current stake |
+| 7 | `NoRewards` | No rewards are available to claim |
 ### Multisig Contract Errors (`MultisigError`)
 
 | Code | Name | Description |
