@@ -13,8 +13,10 @@ target/
 Thumbs.db
 *.log
 
+# Generated TypeScript bindings
+sdk/
+
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
