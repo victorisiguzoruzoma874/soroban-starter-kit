@@ -1,0 +1,28 @@
+use soroban_sdk::{contracttype, Address};
+
+#[contracttype]
+#[derive(Clone)]
+pub enum DataKey {
+    /// Admin address.
+    Admin,
+    /// Token that users stake.
+    StakeToken,
+    /// Token distributed as rewards (may be the same as StakeToken).
+    RewardToken,
+    /// Total tokens currently staked across all stakers.
+    TotalStaked,
+    /// Total reward tokens deposited and not yet claimed.
+    TotalRewards,
+    /// Reward-per-token accumulator (scaled by REWARD_SCALE).
+    RewardPerTokenStored,
+    /// Per-staker: amount staked.
+    Stake(Address),
+    /// Per-staker: reward-per-token snapshot at last update.
+    RewardPerTokenPaid(Address),
+    /// Per-staker: accrued but unclaimed rewards.
+    Rewards(Address),
+}
+
+/// Scaling factor for reward-per-token fixed-point arithmetic.
+/// Using 1e12 gives enough precision for typical token amounts.
+pub const REWARD_SCALE: i128 = 1_000_000_000_000;

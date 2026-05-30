@@ -30,6 +30,7 @@ cargo test
 | **Token** | Custom fungible token with mint/burn/admin controls | DeFi tokens, governance tokens, utility tokens | ✅ Complete |
 | **Escrow** | Two-party escrow with timeout and refund mechanism | P2P trading, service payments, milestone payments | ✅ Complete |
 | **Vesting** | Token vesting with cliff + linear release schedule | Team allocations, investor lockups, employee grants | ✅ Complete |
+| **Staking** | Token staking with proportional reward distribution | DeFi yield, protocol incentives, liquidity mining | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -53,6 +54,16 @@ cargo test
 - **Incremental Claims**: Beneficiary claims accrued tokens on demand
 - **Token Agnostic**: Works with any Soroban-compatible token
 - **Event Emission**: `initialized`, `claimed`, and `revoked` events for off-chain tracking
+- **TTL Management**: Instance storage TTL is extended on every interaction
+
+### Staking Contract Features
+- **Proportional Rewards**: Rewards distributed pro-rata to each staker's share of the pool
+- **Reward-Per-Token Accumulator**: Gas-efficient global accumulator pattern; no per-staker loops
+- **Separate Stake / Reward Tokens**: Stake token and reward token can be the same or different
+- **Admin Reward Deposits**: Admin calls `add_rewards` to top up the reward pool at any time
+- **Incremental Claims**: Stakers call `claim_rewards` independently; rewards accrue continuously
+- **Token Agnostic**: Works with any Soroban-compatible token
+- **Event Emission**: `staked`, `unstaked`, `rewards_claimed`, and `rewards_added` events
 - **TTL Management**: Instance storage TTL is extended on every interaction
 
 Each template includes:
@@ -137,6 +148,18 @@ docker compose up stellar-node
 | 5 | `InvalidSchedule` | `cliff_ledger` >= `end_ledger`, or `end_ledger` is in the past |
 | 6 | `NothingToClaim` | No tokens have vested since the last claim (or vested amount is zero) |
 | 7 | `AlreadyRevoked` | `revoke` was called on a schedule that has already been revoked |
+
+### Staking Contract Errors (`StakingError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `AlreadyInitialized` | `initialize` was called on a contract that is already set up |
+| 2 | `NotInitialized` | An operation was attempted before the contract was initialized |
+| 3 | `Unauthorized` | Caller is not the admin |
+| 4 | `InvalidAmount` | Amount is zero or negative |
+| 5 | `NoStake` | Staker has no stake to unstake or claim from |
+| 6 | `InsufficientStake` | Requested unstake amount exceeds the staker's current stake |
+| 7 | `NoRewards` | No rewards are available to claim |
 
 ## 🤝 Contributing
 
