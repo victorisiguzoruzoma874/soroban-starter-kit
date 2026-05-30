@@ -192,6 +192,7 @@ node scripts/generate-guides.mjs
 
 ### Post-deployment
 
+- [ ] **Contract health verified** — run `./scripts/check-contract-ids.sh` (see §13)
 - [ ] Contract responds to `simulate` calls
 - [ ] Frontend connects to the correct RPC endpoint
 - [ ] Admin functions are restricted to the correct address
@@ -289,6 +290,35 @@ upgrade as complete.
 | Contract already initialized | Deploy a fresh contract; initialization is one-time |
 | Frontend shows wrong network | Check `VITE_STELLAR_NETWORK` in `.env` |
 | CORS errors from RPC | Use a proxy or the official RPC endpoints |
+
+---
+
+## 13. Post-Deployment Contract Verification
+
+After deploying, confirm that every contract in `.contract-ids` is alive:
+
+```bash
+./scripts/check-contract-ids.sh
+```
+
+The script reads `.contract-ids` (format: `name=<CONTRACT_ID>`), invokes `get_state`
+on each contract, and categorises results:
+
+| Status | Meaning |
+|--------|---------|
+| **ALIVE** | Contract responded normally |
+| **EXPIRED TTL** | Entry has expired; extend TTL with `stellar contract extend` |
+| **UNREACHABLE** | Contract not found or RPC error; re-deploy if necessary |
+
+Override the default file or network:
+
+```bash
+./scripts/check-contract-ids.sh .contract-ids.testnet
+STELLAR_NETWORK=mainnet ./scripts/check-contract-ids.sh
+```
+
+The script exits non-zero if any contract is expired or unreachable, making it
+suitable for use in CI/CD pipelines.
 
 ---
 

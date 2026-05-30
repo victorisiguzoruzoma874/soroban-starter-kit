@@ -117,6 +117,32 @@ docker compose up stellar-node
 | 8 | `InvalidAmount` | The specified amount is zero or otherwise invalid |
 | 9 | `InvalidParties` | Buyer, seller, or arbiter addresses are invalid or conflict with each other |
 
+## 📂 Examples
+
+End-to-end working examples are provided in the `examples/` directory:
+
+| Example | Description |
+|---------|-------------|
+| [`examples/typescript/index.js`](examples/typescript/index.js) | Node.js script — deploys token, mints to buyer, runs full escrow lifecycle |
+| [`examples/shell/run.sh`](examples/shell/run.sh) | Equivalent shell script using the Stellar CLI |
+
+Both examples target a local Stellar node. Start one with `./scripts/local-net.sh start` before running.
+
+### TypeScript
+
+```bash
+npm install @stellar/stellar-sdk
+TOKEN_CONTRACT_ID=<id> ESCROW_CONTRACT_ID=<id> node examples/typescript/index.js
+```
+
+### Shell
+
+```bash
+./examples/shell/run.sh
+```
+
+---
+
 ## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, test commands, code style, and the PR process.
