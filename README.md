@@ -63,9 +63,11 @@ Each template includes:
 
 ## 🛠 Prerequisites
 
-- [Rust](https://rustup.rs/) (latest stable)
+- [Rust](https://rustup.rs/) **1.82.0** (pinned via `rust-toolchain.toml` — `rustup` picks this up automatically)
 - [Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup#install-the-soroban-cli)
 - [Docker](https://www.docker.com/) (for local Stellar node)
+
+> **Zero-install option:** Open this repo in a pre-configured environment with all tools ready — see the [Dev Container & Codespaces Guide](docs/devcontainer.md).
 
 ## 📖 Usage
 
@@ -99,6 +101,8 @@ docker compose up stellar-node
 ```
 
 ## ⚠️ Error Reference
+
+> For full details — causes, triggers, and resolution steps — see [docs/error-reference.md](docs/error-reference.md).
 
 ### Token Contract Errors (`TokenError`)
 
@@ -140,6 +144,31 @@ docker compose up stellar-node
 | 8 | `AlreadySigned` | Signer already approved the transaction |
 | 9 | `ThresholdNotMet` | Transaction does not have enough signatures to execute |
 | 10 | `InsufficientApprovals` | Signer-management change lacks enough threshold approvals |
+## 📂 Examples
+
+End-to-end working examples are provided in the `examples/` directory:
+
+| Example | Description |
+|---------|-------------|
+| [`examples/typescript/index.js`](examples/typescript/index.js) | Node.js script — deploys token, mints to buyer, runs full escrow lifecycle |
+| [`examples/shell/run.sh`](examples/shell/run.sh) | Equivalent shell script using the Stellar CLI |
+
+Both examples target a local Stellar node. Start one with `./scripts/local-net.sh start` before running.
+
+### TypeScript
+
+```bash
+npm install @stellar/stellar-sdk
+TOKEN_CONTRACT_ID=<id> ESCROW_CONTRACT_ID=<id> node examples/typescript/index.js
+```
+
+### Shell
+
+```bash
+./examples/shell/run.sh
+```
+
+---
 
 ## 🤝 Contributing
 
@@ -147,12 +176,17 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 
 ## 📚 Resources
 
+- [System Architecture](docs/architecture.md) — High-level design, contract relationships, storage tiers, event model, and admin framework
+- [Security Best Practices](docs/security.md)
+- [Integration Guide](docs/integration-guide.md)
+- [Deployment Guide](docs/deployment-guide.md)
 - [Soroban Documentation](https://soroban.stellar.org/docs)
 - [Stellar Developer Discord](https://discord.gg/stellardev)
 - [Soroban Examples](https://github.com/stellar/soroban-examples)
 - [Freighter Wallet](https://freighter.app/)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [Security Best Practices](docs/security.md)
+ - [Architecture Decision Records](docs/adr/README.md)
 
 ## 📄 License
 
