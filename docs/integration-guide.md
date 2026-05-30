@@ -277,3 +277,403 @@ await token.balance({ id: buyerAddress });
 - [Soroban Documentation](https://soroban.stellar.org/docs)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [Freighter Wallet](https://freighter.app/)
+
+---
+
+## 13. TypeScript SDK Integration Examples
+
+> **SDK Version**: These examples target `@stellar/stellar-sdk` **v13.x** (2026 stable), the current standard for Soroban smart contract integration. Install with:
+> ```bash
+> npm install @stellar/stellar-sdk@^13.0.0
+> ```
+
+The examples below are production-ready patterns with full error handling. They expand on the minimal snippets in Sections 6 and 7.
+
+---
+
+### Shared Setup
+
+```ts
+import {
+  SorobanRpc,
+  Networks,
+  Keypair,
+  TransactionBuilder,
+  BASE_FEE,
+  Contract,
+  nativeToScVal,
+  Address,
+  xdr,
+} from '@stellar/stellar-sdk';
+
+const RPC_URL = 'https://soroban-testnet.stellar.org';
+const NETWORK_PASSPHRASE = Networks.TESTNET;
+
+const server = new SorobanRpc.Server(RPC_URL, { allowHttp: false });
+
+/** Build, simulate, sign, and submit a transaction. */
+async function invokeContract(
+  sourceKeypair: Keypair,
+  contractId: string,
+  method: string,
+  args: xdr.ScVal[],
+): Promise<SorobanRpc.Api.GetSuccessfulTransactionResponse> {
+  const account = await server.getAccount(sourceKeypair.publicKey());
+  const contract = new Contract(contractId);
+
+  const tx = new TransactionBuilder(account, {
+    fee: BASE_FEE,
+    networkPassphrase: NETWORK_PASSPHRASE,
+  })
+    .addOperation(contract.call(method, ...args))
+    .setTimeout(30)
+    .build();
+
+  // Simulate first to catch errors cheaply
+  const simResult = await server.simulateTransaction(tx);
+  if (SorobanRpc.Api.isSimulationError(simResult)) {
+    throw new Error(`Simulation failed: ${simResult.error}`);
+  }
+
+  const prepared = await server.prepareTransaction(tx);
+  prepared.sign(sourceKeypair);
+
+  const sendResult = await server.sendTransaction(prepared);
+  if (sendResult.status === 'ERROR') {
+    throw new Error(`Submission failed: ${JSON.stringify(sendResult.errorResult)}`);
+  }
+
+  // Poll for finality
+  let getResult = await server.getTransaction(sendResult.hash);
+  while (getResult.status === SorobanRpc.Api.GetTransactionStatus.NOT_FOUND) {
+    await new Promise((r) => setTimeout(r, 1000));
+    getResult = await server.getTransaction(sendResult.hash);
+  }
+
+  if (getResult.status !== SorobanRpc.Api.GetTransactionStatus.SUCCESS) {
+    throw new Error(`Transaction failed: ${getResult.status}`);
+  }
+
+  return getResult as SorobanRpc.Api.GetSuccessfulTransactionResponse;
+}
+```
+
+---
+
+### Workflow A: Token Operations
+
+#### A-1. Initialize Token Contract
+
+```ts
+/**
+ * Initialize the token contract with admin, name, symbol, and decimals.
+ * Must be called once after deployment; throws AlreadyInitialized on repeat calls.
+ */
+async function initializeToken(
+  adminKeypair: Keypair,
+  tokenContractId: string,
+  name: string,
+  symbol: string,
+  decimals: number,
+): Promise<void> {
+  try {
+    await invokeContract(adminKeypair, tokenContractId, 'initialize', [
+      new Address(adminKeypair.publicKey()).toScVal(), // admin
+      nativeToScVal(name, { type: 'string' }),         // name
+      nativeToScVal(symbol, { type: 'string' }),       // symbol
+      nativeToScVal(decimals, { type: 'u32' }),        // decimals
+    ]);
+    console.log(`Token "${symbol}" initialized on contract ${tokenContractId}`);
+  } catch (err) {
+    // AlreadyInitialized (error code 4) means the contract is already set up
+    if (err instanceof Error && err.message.includes('AlreadyInitialized')) {
+      console.warn('Token already initialized — skipping.');
+    } else {
+      console.error('initializeToken failed:', err);
+      throw err;
+    }
+  }
+}
+```
+
+#### A-2. Mint Tokens
+
+```ts
+/**
+ * Mint tokens to a recipient. Requires admin keypair.
+ * Amount is in the token's smallest unit (e.g., stroops for 7-decimal tokens).
+ */
+async function mintTokens(
+  adminKeypair: Keypair,
+  tokenContractId: string,
+  recipientAddress: string,
+  amount: bigint,
+): Promise<void> {
+  try {
+    await invokeContract(adminKeypair, tokenContractId, 'mint', [
+      new Address(recipientAddress).toScVal(),  // to
+      nativeToScVal(amount, { type: 'i128' }),  // amount
+    ]);
+    console.log(`Minted ${amount} tokens to ${recipientAddress}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('Unauthorized')) {
+        console.error('Mint failed: caller is not the admin.');
+      } else if (err.message.includes('InvalidAmount')) {
+        console.error('Mint failed: amount must be positive and within max supply.');
+      } else {
+        console.error('mintTokens failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+#### A-3. Transfer Tokens
+
+```ts
+/**
+ * Transfer tokens between two accounts.
+ * The source keypair must own the funds; no admin privileges required.
+ */
+async function transferTokens(
+  senderKeypair: Keypair,
+  tokenContractId: string,
+  recipientAddress: string,
+  amount: bigint,
+): Promise<void> {
+  try {
+    await invokeContract(senderKeypair, tokenContractId, 'transfer', [
+      new Address(senderKeypair.publicKey()).toScVal(), // from
+      new Address(recipientAddress).toScVal(),          // to
+      nativeToScVal(amount, { type: 'i128' }),          // amount
+    ]);
+    console.log(`Transferred ${amount} tokens to ${recipientAddress}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('InsufficientBalance')) {
+        console.error('Transfer failed: sender balance too low.');
+      } else {
+        console.error('transferTokens failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+#### A-4. Approve Allowance
+
+```ts
+/**
+ * Approve a spender to transfer up to `amount` tokens on the owner's behalf.
+ * `expirationLedger` sets when the allowance expires (use 0 for no expiry).
+ */
+async function approveAllowance(
+  ownerKeypair: Keypair,
+  tokenContractId: string,
+  spenderAddress: string,
+  amount: bigint,
+  expirationLedger: number,
+): Promise<void> {
+  try {
+    await invokeContract(ownerKeypair, tokenContractId, 'approve', [
+      new Address(ownerKeypair.publicKey()).toScVal(), // from (owner)
+      new Address(spenderAddress).toScVal(),           // spender
+      nativeToScVal(amount, { type: 'i128' }),         // amount
+      nativeToScVal(expirationLedger, { type: 'u32' }),// expiration_ledger
+    ]);
+    console.log(`Approved ${amount} tokens for spender ${spenderAddress}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('InvalidAmount')) {
+        console.error('Approve failed: amount must be non-negative.');
+      } else {
+        console.error('approveAllowance failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+---
+
+### Workflow B: Escrow Operations
+
+#### B-1. Initialize Escrow Contract
+
+```ts
+/**
+ * Initialize the escrow with all parties and terms.
+ * `deadline` is a Unix timestamp (seconds). `arbiter` may be the zero address
+ * if no dispute resolution is needed.
+ */
+async function initializeEscrow(
+  deployerKeypair: Keypair,
+  escrowContractId: string,
+  buyerAddress: string,
+  sellerAddress: string,
+  arbiterAddress: string,
+  tokenContractId: string,
+  amount: bigint,
+  deadline: number,
+): Promise<void> {
+  try {
+    await invokeContract(deployerKeypair, escrowContractId, 'initialize', [
+      new Address(buyerAddress).toScVal(),              // buyer
+      new Address(sellerAddress).toScVal(),             // seller
+      new Address(arbiterAddress).toScVal(),            // arbiter
+      new Address(tokenContractId).toScVal(),           // token
+      nativeToScVal(amount, { type: 'i128' }),          // amount
+      nativeToScVal(deadline, { type: 'u64' }),         // deadline
+    ]);
+    console.log(`Escrow initialized: ${escrowContractId}`);
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('AlreadyInitialized')) {
+        console.warn('Escrow already initialized — skipping.');
+      } else if (err.message.includes('InvalidParties')) {
+        console.error('Escrow init failed: buyer, seller, and arbiter must be distinct.');
+      } else {
+        console.error('initializeEscrow failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+#### B-2. Fund the Escrow
+
+```ts
+/**
+ * Buyer funds the escrow by transferring the agreed amount into the contract.
+ * The buyer must have previously approved the escrow contract as a spender
+ * (see approveAllowance above) or hold sufficient balance for a direct transfer.
+ */
+async function fundEscrow(
+  buyerKeypair: Keypair,
+  escrowContractId: string,
+): Promise<void> {
+  try {
+    await invokeContract(buyerKeypair, escrowContractId, 'fund', [
+      new Address(buyerKeypair.publicKey()).toScVal(), // buyer (auth check)
+    ]);
+    console.log('Escrow funded successfully.');
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('InsufficientFunds')) {
+        console.error('Fund failed: buyer token balance is too low.');
+      } else if (err.message.includes('InvalidState')) {
+        console.error('Fund failed: escrow is not in the expected state.');
+      } else if (err.message.includes('DeadlinePassed')) {
+        console.error('Fund failed: escrow deadline has already passed.');
+      } else {
+        console.error('fundEscrow failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+#### B-3. Mark Delivery
+
+```ts
+/**
+ * Seller marks the goods/service as delivered.
+ * Transitions escrow state from Funded → Delivered.
+ */
+async function markDelivered(
+  sellerKeypair: Keypair,
+  escrowContractId: string,
+): Promise<void> {
+  try {
+    await invokeContract(sellerKeypair, escrowContractId, 'mark_delivered', [
+      new Address(sellerKeypair.publicKey()).toScVal(), // seller (auth check)
+    ]);
+    console.log('Delivery marked by seller.');
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('NotAuthorized')) {
+        console.error('Mark delivered failed: caller is not the seller.');
+      } else if (err.message.includes('InvalidState')) {
+        console.error('Mark delivered failed: escrow must be in Funded state.');
+      } else {
+        console.error('markDelivered failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+#### B-4. Approve Delivery and Release Funds
+
+```ts
+/**
+ * Buyer (or arbiter) approves delivery, releasing escrowed funds to the seller.
+ * Transitions escrow state from Delivered → Released.
+ */
+async function approveDelivery(
+  buyerKeypair: Keypair,
+  escrowContractId: string,
+): Promise<void> {
+  try {
+    await invokeContract(buyerKeypair, escrowContractId, 'approve_delivery', [
+      new Address(buyerKeypair.publicKey()).toScVal(), // buyer (auth check)
+    ]);
+    console.log('Delivery approved — funds released to seller.');
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('NotAuthorized')) {
+        console.error('Approve delivery failed: caller is not the buyer or arbiter.');
+      } else if (err.message.includes('InvalidState')) {
+        console.error('Approve delivery failed: delivery must be marked first.');
+      } else {
+        console.error('approveDelivery failed:', err.message);
+      }
+    }
+    throw err;
+  }
+}
+```
+
+---
+
+### End-to-End Usage Example
+
+```ts
+// Configure keypairs and contract IDs from environment variables
+const adminKeypair  = Keypair.fromSecret(process.env.ADMIN_SECRET!);
+const buyerKeypair  = Keypair.fromSecret(process.env.BUYER_SECRET!);
+const sellerKeypair = Keypair.fromSecret(process.env.SELLER_SECRET!);
+
+const TOKEN_CONTRACT_ID  = process.env.TOKEN_CONTRACT_ID!;
+const ESCROW_CONTRACT_ID = process.env.ESCROW_CONTRACT_ID!;
+
+const AMOUNT = BigInt(100_000_000); // 10 tokens at 7 decimals
+
+(async () => {
+  // --- Token workflow ---
+  await initializeToken(adminKeypair, TOKEN_CONTRACT_ID, 'MyToken', 'MTK', 7);
+  await mintTokens(adminKeypair, TOKEN_CONTRACT_ID, buyerKeypair.publicKey(), AMOUNT);
+  await approveAllowance(buyerKeypair, TOKEN_CONTRACT_ID, ESCROW_CONTRACT_ID, AMOUNT, 0);
+
+  // --- Escrow workflow ---
+  const deadline = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
+  await initializeEscrow(
+    adminKeypair, ESCROW_CONTRACT_ID,
+    buyerKeypair.publicKey(), sellerKeypair.publicKey(),
+    adminKeypair.publicKey(), // arbiter = admin for this example
+    TOKEN_CONTRACT_ID, AMOUNT, deadline,
+  );
+  await fundEscrow(buyerKeypair, ESCROW_CONTRACT_ID);
+  await markDelivered(sellerKeypair, ESCROW_CONTRACT_ID);
+  await approveDelivery(buyerKeypair, ESCROW_CONTRACT_ID);
+
+  console.log('Full token + escrow workflow completed successfully.');
+})();
+```
