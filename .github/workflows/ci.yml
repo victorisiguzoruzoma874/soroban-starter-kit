@@ -40,8 +40,32 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
-    name: Tests
+    name: Tests (${{ matrix.package }} / ${{ matrix.features || 'no features' }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # token feature combinations
+          - package: soroban-token-template
+            features: ""
+          - package: soroban-token-template
+            features: pausable
+          - package: soroban-token-template
+            features: upgradeable
+          - package: soroban-token-template
+            features: capped-supply
+          - package: soroban-token-template
+            features: pausable,upgradeable,capped-supply,freeze
+          # escrow feature combinations
+          - package: soroban-escrow-template
+            features: ""
+          - package: soroban-escrow-template
+            features: pausable
+          - package: soroban-escrow-template
+            features: upgradeable
+          - package: soroban-escrow-template
+            features: pausable,upgradeable
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +76,12 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run tests
-        run: cargo test --workspace
+        run: |
+          if [ -n "${{ matrix.features }}" ]; then
+            cargo test -p ${{ matrix.package }} --features ${{ matrix.features }}
+          else
+            cargo test -p ${{ matrix.package }}
+          fi
 
   coverage:
     name: Code Coverage
