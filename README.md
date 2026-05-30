@@ -29,6 +29,7 @@ cargo test
 |----------|-------------|-----------|---------|
 | **Token** | Custom fungible token with mint/burn/admin controls | DeFi tokens, governance tokens, utility tokens | ✅ Complete |
 | **Escrow** | Two-party escrow with timeout and refund mechanism | P2P trading, service payments, milestone payments | ✅ Complete |
+| **Multisig** | N-of-M wallet for threshold-approved contract calls | DAO treasuries, team wallets, shared administration | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -45,6 +46,14 @@ cargo test
 - **State Management**: Clear transaction lifecycle
 - **Token Agnostic**: Works with any Soroban token
 - **Event Emission**: All operations emit events for tracking
+
+### Multisig Contract Features
+- **N-of-M Authorization**: Configure any valid threshold across unique signers
+- **Signer Management**: Add or remove signers with threshold-approved changes
+- **Transaction Proposals**: Store target contract, function, and arguments
+- **Signature Tracking**: Prevent duplicate signatures and non-signer approvals
+- **Threshold Execution**: Execute proposed calls only after enough signatures
+- **Event Emission**: Initialization, signer changes, signatures, and execution emit events
 
 Each template includes:
 - ✅ Complete contract implementation
@@ -121,6 +130,20 @@ docker compose up stellar-node
 | 8 | `InvalidAmount` | The specified amount is zero or otherwise invalid |
 | 9 | `InvalidParties` | Buyer, seller, or arbiter addresses are invalid or conflict with each other |
 
+### Multisig Contract Errors (`MultisigError`)
+
+| Code | Name | Description |
+|------|------|-------------|
+| 1 | `AlreadyInitialized` | `initialize` was called after the signer set was already configured |
+| 2 | `NotInitialized` | An operation was attempted before the multisig was initialized |
+| 3 | `InvalidThreshold` | Threshold is zero or greater than the number of signers |
+| 4 | `InvalidSigners` | Signer or approval lists are empty or contain duplicates |
+| 5 | `NotSigner` | Caller, approver, or signer is not part of the wallet signer set |
+| 6 | `TransactionNotFound` | Requested transaction ID does not exist |
+| 7 | `AlreadyExecuted` | Transaction has already been executed |
+| 8 | `AlreadySigned` | Signer already approved the transaction |
+| 9 | `ThresholdNotMet` | Transaction does not have enough signatures to execute |
+| 10 | `InsufficientApprovals` | Signer-management change lacks enough threshold approvals |
 ## 📂 Examples
 
 End-to-end working examples are provided in the `examples/` directory:

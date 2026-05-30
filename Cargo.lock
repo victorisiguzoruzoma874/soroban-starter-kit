@@ -1402,6 +1402,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-multisig-template"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-sdk"
 version = "21.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
