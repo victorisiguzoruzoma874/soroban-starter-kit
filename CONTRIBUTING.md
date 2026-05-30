@@ -130,6 +130,8 @@ Additional conventions:
 
 ## Adding a New Contract Template
 
+For the full step-by-step guide, see [docs/adding-a-contract.md](docs/adding-a-contract.md).
+
 Follow these steps to add a contract that fits the existing project structure:
 
 1. **Scaffold the crate**
