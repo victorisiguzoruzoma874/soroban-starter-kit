@@ -1,0 +1,64 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Run all contract tests",
+      "cargo": {
+        "args": ["test", "--no-run", "--workspace"],
+        "filter": {
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Run specific test by name",
+      "cargo": {
+        "args": ["test", "--no-run", "--workspace"],
+        "filter": {
+          "kind": "test"
+        }
+      },
+      "args": ["${input:testName}"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Run tests with feature flag",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--workspace",
+          "--features",
+          "${input:featureFlag}"
+        ],
+        "filter": {
+          "kind": "test"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "testName",
+      "type": "promptString",
+      "description": "Test name (substring match)",
+      "default": ""
+    },
+    {
+      "id": "featureFlag",
+      "type": "promptString",
+      "description": "Cargo feature flag(s) to enable",
+      "default": "upgradeable"
+    }
+  ]
+}

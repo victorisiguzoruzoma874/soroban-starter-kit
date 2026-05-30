@@ -240,7 +240,38 @@ front-running, upgrade timelocks, and event monitoring, see
 
 ---
 
-## 12. Resources
+## 12. Generating TypeScript Bindings
+
+The Stellar CLI can generate typed TypeScript bindings directly from a deployed
+contract. Use the provided script to automate this for every contract in
+`.contract-ids`:
+
+```bash
+./scripts/generate-types.sh
+```
+
+Generated bindings land in `sdk/<contract-name>/` and are excluded from version
+control via `.gitignore`. Regenerate them whenever a contract is upgraded.
+
+### Override network or IDs file
+
+```bash
+STELLAR_NETWORK=mainnet ./scripts/generate-types.sh .contract-ids.mainnet
+```
+
+### Import the generated bindings
+
+```ts
+import * as TokenClient  from './sdk/token';
+import * as EscrowClient from './sdk/escrow';
+
+const token = new TokenClient.Client({ rpcUrl: '...', networkPassphrase: '...', contractId: '...' });
+await token.balance({ id: buyerAddress });
+```
+
+---
+
+## 14. Resources
 
 - [Stellar SDK Docs](https://stellar.github.io/js-stellar-sdk/)
 - [Soroban Documentation](https://soroban.stellar.org/docs)
