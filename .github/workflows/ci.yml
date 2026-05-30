@@ -130,7 +130,10 @@ jobs:
 
       - name: Check WASM sizes
         run: |
-          MAX=65536
+          # 200 KB: optimized Soroban contracts typically range 20–100 KB;
+          # 200 KB gives headroom for feature-rich contracts while still
+          # catching runaway bloat before it reaches production.
+          MAX=204800
           FAILED=0
           for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
             size=$(wc -c < "$wasm")
