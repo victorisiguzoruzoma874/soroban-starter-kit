@@ -1,5 +1,7 @@
 # Compute Unit (CU) Cost Reference
 
+_Last verified: 2026-05-30 · Protocol 22_
+
 Soroban charges **compute units (CUs)** per transaction. Each contract
 invocation consumes CUs based on CPU instructions, memory, ledger I/O, and
 host-function calls. The figures below are measured using the Soroban test
@@ -13,10 +15,34 @@ CU cost.
 > - *Storage ops* – number of instance/persistent/temporary reads + writes
 >   performed by the function (each carries a fixed host-function overhead).
 > - *Token transfers* – cross-contract calls to the token contract; each adds
->   roughly **1 000 – 2 000 CUs** on top of the base cost.
-> - The Soroban network fee is calculated as `CUs × fee_per_CU` where
->   `fee_per_CU` is set by validators (currently ~100 stroops per 10 000 CUs
->   on Testnet).
+>   roughly **500 000 – 700 000 CUs** on top of the base cost.
+> - The Soroban network resource fee is calculated from protocol-defined rates
+>   for CPU instructions, ledger reads/writes, bandwidth, history, events, and
+>   rent. Under Protocol 22, CPU instructions cost **7 stroops per 10,000
+>   instructions**; the total transaction fee depends on all resource components.
+
+---
+
+## Protocol 22 Fee Schedule
+The following resource fee rates are current for Stellar Protocol 22. Verify
+these values anytime the SDK or protocol version changes.
+
+| Resource | Cost (stroops) |
+|---|---|
+| 10,000 CPU instructions | 7 |
+| Read 1 ledger entry from disk | 1,563 |
+| Read 1 KB from disk | 447 |
+| Write 1 ledger entry | 2,500 |
+| Write 1 KB to disk | 875 |
+| 1 KB transaction size (bandwidth) | 406 |
+| 1 KB transaction size (history) | 4,059 |
+| 1 KB events/return value | 5,000 |
+| 30 days of rent for 1 KB persistent storage | ~426,667 |
+| 30 days of rent for 1 KB temporary storage | ~213,334 |
+
+The values above are the protocol-defined rates used to compute Soroban resource
+fees. Actual transaction fees will vary depending on the declared resource
+usage and the validator-set limits in effect.
 
 ---
 

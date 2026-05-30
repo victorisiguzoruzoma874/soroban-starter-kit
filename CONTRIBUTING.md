@@ -58,6 +58,14 @@ cargo +nightly udeps --workspace --all-targets
 - Format: `cargo fmt --all`
 - Lint: `cargo clippy --workspace --all-targets -- -D warnings`
 - Tests: `cargo test --workspace`
+## Documentation updates
+
+- When upgrading `soroban-sdk` or changing the Soroban protocol version, verify
+  and update `docs/gas-costs.md`.
+- Include a `Last verified` date and protocol version in the document header.
+- Confirm that Protocol 22 fee schedule values are still correct and update any
+  stale network fee assumptions.
+
 # Contributing to Soroban Starter Kit
 
 Thanks for taking the time to contribute. This guide covers everything you need to get set up, write good code, and get your changes merged.
