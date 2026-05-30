@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # deploy.sh — build and deploy Soroban contracts
-# Usage: ./scripts/deploy.sh [testnet|mainnet|local] [contract]
+# Usage: ./scripts/deploy.sh [testnet|mainnet|local] [contract] [--identity <name>]
 set -euo pipefail
 
 check_prerequisites() {
@@ -22,6 +22,32 @@ CONTRACTS_DIR="$ROOT/contracts"
 
 NETWORK="${1:-testnet}"
 CONTRACT="${2:-all}"
+
+# Parse --identity flag from remaining args
+IDENTITY="default"
+for i in "$@"; do
+  if [[ "$i" == "--identity" ]]; then
+    shift_next=true
+  elif [[ "${shift_next:-false}" == "true" ]]; then
+    IDENTITY="$i"
+    shift_next=false
+  fi
+done
+
+# Validate that the chosen identity exists
+if ! stellar keys show "$IDENTITY" &>/dev/null 2>&1; then
+  echo "ERROR: Stellar identity '$IDENTITY' not found." >&2
+  echo "" >&2
+  echo "To set up an identity, run one of the following:" >&2
+  echo "  stellar keys generate --global $IDENTITY" >&2
+  echo "  stellar keys add $IDENTITY --secret-key" >&2
+  if [[ "$IDENTITY" == "default" ]]; then
+    echo "" >&2
+    echo "Or specify a different identity with: --identity <name>" >&2
+    echo "  ./scripts/deploy.sh $NETWORK $CONTRACT --identity <your-key-name>" >&2
+  fi
+  exit 1
+fi
 
 case "$NETWORK" in
   testnet)
@@ -58,7 +84,7 @@ deploy_contract() {
     --wasm "$WASM" \
     --rpc-url "$RPC_URL" \
     --network-passphrase "$PASSPHRASE" \
-    --source-account default \
+    --source-account "$IDENTITY" \
     --network "$NETWORK")
   echo "$name: $CONTRACT_ID" >> "$ROOT/.contract-ids"
   echo "Contract ID: $CONTRACT_ID"

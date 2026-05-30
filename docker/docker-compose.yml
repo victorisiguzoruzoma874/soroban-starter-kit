@@ -50,10 +50,11 @@ services:
     environment:
       - ENABLE_SOROBAN_RPC=true
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/" ]
+      test: ["CMD-SHELL", "curl -sf -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}' http://localhost:8000/soroban/rpc | grep -q healthy"]
       interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 30
+      start_period: 30s
 
 # To clean the cargo-cache volume (which can grow to several GB), run:
 # docker volume rm soroban-starter-kit_cargo-cache
