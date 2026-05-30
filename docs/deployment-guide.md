@@ -132,7 +132,47 @@ VITE_NETWORK_PASSPHRASE="Public Global Stellar Network ; September 2015"
 
 ---
 
-## 2. Local Deployment
+## 2. Identity Setup
+
+`scripts/deploy.sh` uses a Stellar CLI identity (key pair) as the transaction source account. Before deploying, ensure the identity exists on your machine.
+
+### Check if the default identity exists
+
+```bash
+stellar keys show default
+```
+
+If the command fails with "not found", create it:
+
+```bash
+# Generate a new key pair and store it globally
+stellar keys generate --global default
+
+# Or import an existing secret key
+stellar keys add default --secret-key
+# (you will be prompted to enter the secret key)
+```
+
+### Using a custom identity
+
+Pass `--identity <name>` to use a key other than `default`:
+
+```bash
+./scripts/deploy.sh testnet --identity my-deployer
+./scripts/deploy.sh local token --identity alice
+```
+
+`deploy.sh` validates the identity before building any contracts and prints setup guidance if it is missing.
+
+### Funding the identity (testnet)
+
+```bash
+stellar keys fund default --network testnet
+```
+
+---
+
+## 3. Local Deployment
 
 ```bash
 # Start local Stellar node
@@ -150,7 +190,7 @@ npm run dev
 
 ---
 
-## 3. Testnet Deployment
+## 4. Testnet Deployment
 
 ### Step 1: Ensure Your Identity is Funded
 
@@ -241,7 +281,7 @@ The script is idempotent: contracts that return an "already initialized" error a
 
 ---
 
-## 4. Mainnet Deployment
+## 5. Mainnet Deployment
 
 > ⚠️ Mainnet deployments are irreversible. Complete testnet validation first.
 
@@ -262,7 +302,7 @@ stellar contract deploy --wasm <path>.wasm \
 
 ---
 
-## 5. Frontend Deployment
+## 6. Frontend Deployment
 
 ### Build
 
@@ -293,7 +333,7 @@ npm run build
 
 ---
 
-## 6. CI/CD Pipeline
+## 7. CI/CD Pipeline
 
 The GitHub Actions workflow at `.github/workflows/ci.yml` runs on every push:
 
@@ -315,7 +355,7 @@ To add automated deployment, extend `.github/workflows/ci.yml`:
 
 ---
 
-## 7. Automated Guide Generation
+## 8. Automated Guide Generation
 
 Run the docs check script to validate documentation coverage and regenerate the docs report:
 
@@ -333,7 +373,7 @@ node scripts/generate-guides.mjs
 
 ---
 
-## 8. Validation Checklist
+## 9. Validation Checklist
 
 ### Pre-deployment
 
@@ -355,7 +395,7 @@ node scripts/generate-guides.mjs
 
 ---
 
-## 9. Security Considerations
+## 10. Security Considerations
 
 - Store `STELLAR_SECRET_KEY` only in CI secrets, never in `.env` committed to git
 - Use separate deployer accounts per environment (local / testnet / mainnet)
@@ -370,7 +410,7 @@ node scripts/generate-guides.mjs
 
 ---
 
-## 10. Performance Optimization
+## 11. Performance Optimization
 
 - Build contracts with `--release` flag (default in `deploy.sh`)
 - Minimize contract storage reads — cache values in `Env::storage().instance()`
@@ -380,7 +420,7 @@ node scripts/generate-guides.mjs
 
 ---
 
-## 11. Contract Upgrades (Timelock)
+## 12. Contract Upgrades (Timelock)
 
 Both the Token and Escrow contracts enforce a **two-step upgrade process** when
 built with the `upgradeable` / `pausable` feature flags. A minimum delay of
@@ -433,7 +473,7 @@ upgrade as complete.
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 ### Identity and Funding Issues
 

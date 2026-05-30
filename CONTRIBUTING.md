@@ -79,13 +79,13 @@ Thanks for taking the time to contribute. This guide covers everything you need 
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Rust | latest stable | [rustup.rs](https://rustup.rs/) |
+| Rust | **1.82.0** (pinned) | [rustup.rs](https://rustup.rs/) |
 | wasm32 target | — | `rustup target add wasm32-unknown-unknown` |
 | Stellar CLI | latest | [docs](https://developers.stellar.org/docs/tools/developer-tools/cli/stellar-cli) |
 | Docker | 24+ | [docker.com](https://www.docker.com/) |
 
 ```bash
-# Install Rust
+# Install Rust (rustup automatically installs 1.82.0 via rust-toolchain.toml)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Add the WASM compilation target
@@ -94,6 +94,15 @@ rustup target add wasm32-unknown-unknown
 # Install Stellar CLI
 cargo install stellar-cli
 ```
+
+### Updating the pinned Rust version
+
+The Rust toolchain is pinned in `rust-toolchain.toml` to ensure reproducible builds across all developers and CI. To update it:
+
+1. Edit `rust-toolchain.toml` and change `channel` to the new version (e.g. `"1.83.0"`).
+2. Run `cargo check --workspace` to confirm everything compiles on the new version.
+3. Update the version reference in `README.md` and this file to match.
+4. Open a PR with the toolchain bump — CI will validate it against all targets.
 
 ---
 

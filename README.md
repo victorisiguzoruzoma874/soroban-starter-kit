@@ -54,7 +54,7 @@ Each template includes:
 
 ## 🛠 Prerequisites
 
-- [Rust](https://rustup.rs/) (latest stable)
+- [Rust](https://rustup.rs/) **1.82.0** (pinned via `rust-toolchain.toml` — `rustup` picks this up automatically)
 - [Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup#install-the-soroban-cli)
 - [Docker](https://www.docker.com/) (for local Stellar node)
 
