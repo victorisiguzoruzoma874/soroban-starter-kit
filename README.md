@@ -58,6 +58,8 @@ Each template includes:
 - [Soroban CLI](https://soroban.stellar.org/docs/getting-started/setup#install-the-soroban-cli)
 - [Docker](https://www.docker.com/) (for local Stellar node)
 
+> **Zero-install option:** Open this repo in a pre-configured environment with all tools ready — see the [Dev Container & Codespaces Guide](docs/devcontainer.md).
+
 ## 📖 Usage
 
 ### Building Contracts
