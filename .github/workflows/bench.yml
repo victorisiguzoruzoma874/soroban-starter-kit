@@ -9,15 +9,19 @@ jobs:
   bench:
     name: Run criterion benchmarks
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
 
       - name: Cache cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
             ~/.cargo/registry
@@ -32,6 +36,142 @@ jobs:
         run: |
           cargo bench --package contract-benchmarks -- \
             --save-baseline ci_baseline 2>&1 | tee bench_output.txt
+
+      - name: Parse benchmark results to JSON
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import re, json
+
+          with open("bench_output.txt") as f:
+              text = f.read()
+
+          results = {}
+          multipliers = {"ns": 1, "µs": 1_000, "ms": 1_000_000, "s": 1_000_000_000}
+          # Capture the lower-bound value from: name  time: [lower estimate upper]
+          pattern = r'^(.+?)\s+time:\s+\[\s*([\d.]+)\s*(ns|µs|ms|s)'
+          for m in re.finditer(pattern, text, re.MULTILINE):
+              name = m.group(1).strip()
+              value, unit = float(m.group(2)), m.group(3)
+              results[name] = value * multipliers[unit]
+
+          with open("bench_results.json", "w") as f:
+              json.dump(results, f, indent=2)
+          print(f"Parsed {len(results)} benchmark results")
+          EOF
+
+      # ── Baseline storage (main branch only) ───────────────────────────────
+      - name: Upload baseline artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-baseline
+          path: bench_results.json
+          retention-days: 90
+
+      # ── PR regression check ───────────────────────────────────────────────
+      - name: Download baseline from main
+        if: github.event_name == 'pull_request'
+        id: download_baseline
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: bench.yml
+          branch: main
+          name: bench-baseline
+          path: baseline
+        continue-on-error: true
+
+      - name: Compare benchmarks against baseline (10% threshold)
+        if: github.event_name == 'pull_request'
+        id: regression_check
+        shell: bash
+        run: |
+          python3 - <<'EOF'
+          import json, os, sys
+
+          baseline_path = "baseline/bench_results.json"
+          if not os.path.exists(baseline_path):
+              msg = "## Benchmark Regression Report\n\n> No baseline available yet. A baseline will be stored once a build completes on `main`."
+              print(msg)
+              with open("regression_report.md", "w") as f:
+                  f.write(msg)
+              sys.exit(0)
+
+          with open(baseline_path) as f:
+              baseline = json.load(f)
+          with open("bench_results.json") as f:
+              current = json.load(f)
+
+          THRESHOLD = 0.10
+          failures = []
+          rows = []
+
+          for name in sorted(set(list(baseline.keys()) + list(current.keys()))):
+              base_ns = baseline.get(name)
+              curr_ns = current.get(name)
+              if base_ns is None:
+                  rows.append(f"| `{name}` | — | {curr_ns:.0f} ns | new |")
+              elif curr_ns is None:
+                  rows.append(f"| `{name}` | {base_ns:.0f} ns | — | missing |")
+              else:
+                  change = (curr_ns - base_ns) / base_ns
+                  icon = "OK" if change <= THRESHOLD else "FAIL"
+                  rows.append(f"| `{name}` | {base_ns:.0f} ns | {curr_ns:.0f} ns | [{icon}] {change:+.1%} |")
+                  if change > THRESHOLD:
+                      failures.append(f"`{name}` ({change:+.1%})")
+
+          table = "\n".join(rows)
+          if failures:
+              summary = f"\n\n**Regressions exceed 10% threshold:** {', '.join(failures)}"
+          else:
+              summary = "\n\nAll benchmarks within acceptable range."
+
+          report = (
+              "## Benchmark Regression Report\n\n"
+              "| Benchmark | Baseline | Current | Change |\n"
+              "|-----------|----------|---------|--------|\n"
+              f"{table}{summary}"
+          )
+
+          with open("regression_report.md", "w") as f:
+              f.write(report)
+          print(report)
+
+          if failures:
+              print(f"\nFailing CI due to regressions: {', '.join(failures)}", file=sys.stderr)
+              sys.exit(1)
+          EOF
+
+      - name: Post regression report as PR comment
+        if: github.event_name == 'pull_request' && (success() || failure())
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            if (!fs.existsSync('regression_report.md')) return;
+            const body = fs.readFileSync('regression_report.md', 'utf8');
+            const marker = '## Benchmark Regression Report';
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
 
       # ── Threshold check ────────────────────────────────────────────────────
       # Criterion prints "time: [lower  estimate  upper]" lines.

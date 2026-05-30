@@ -1,3 +1,63 @@
+# Contributing
+
+## Pre-commit hooks
+
+This project ships a `.pre-commit-config.yaml` that runs `cargo fmt` and `cargo clippy` before every commit so you catch issues locally instead of in CI.
+
+### Setup
+
+```bash
+pip install pre-commit          # or: brew install pre-commit
+pre-commit install              # wire the hook into .git/hooks/pre-commit
+```
+
+From now on, every `git commit` will automatically run:
+
+- **`cargo fmt --check`** — rejects commits with unformatted Rust code. Run `cargo fmt` to fix.
+- **`cargo clippy`** — rejects commits that introduce Clippy warnings treated as errors.
+
+To run the hooks manually without committing:
+
+```bash
+pre-commit run --all-files
+```
+
+---
+
+## CI checks
+
+### cargo-machete (unused dependencies)
+
+The `machete` CI job runs `cargo machete --workspace` to detect unused entries in `Cargo.toml`.
+If the job fails, remove the flagged dependencies and push again.
+
+Install locally:
+
+```bash
+cargo install cargo-machete
+cargo machete --workspace
+```
+
+### cargo-udeps (unused dev-dependencies)
+
+The `udeps` CI job runs `cargo +nightly udeps --workspace --all-targets` using nightly Rust.
+It catches unused `[dev-dependencies]` that `cargo-machete` may miss.
+
+Install locally:
+
+```bash
+rustup toolchain install nightly
+cargo install cargo-udeps --locked
+cargo +nightly udeps --workspace --all-targets
+```
+
+---
+
+## Code style
+
+- Format: `cargo fmt --all`
+- Lint: `cargo clippy --workspace --all-targets -- -D warnings`
+- Tests: `cargo test --workspace`
 # Contributing to Soroban Starter Kit
 
 Thanks for taking the time to contribute. This guide covers everything you need to get set up, write good code, and get your changes merged.
@@ -19,13 +79,13 @@ Thanks for taking the time to contribute. This guide covers everything you need 
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Rust | latest stable | [rustup.rs](https://rustup.rs/) |
+| Rust | **1.82.0** (pinned) | [rustup.rs](https://rustup.rs/) |
 | wasm32 target | — | `rustup target add wasm32-unknown-unknown` |
 | Stellar CLI | latest | [docs](https://developers.stellar.org/docs/tools/developer-tools/cli/stellar-cli) |
 | Docker | 24+ | [docker.com](https://www.docker.com/) |
 
 ```bash
-# Install Rust
+# Install Rust (rustup automatically installs 1.82.0 via rust-toolchain.toml)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Add the WASM compilation target
@@ -34,6 +94,15 @@ rustup target add wasm32-unknown-unknown
 # Install Stellar CLI
 cargo install stellar-cli
 ```
+
+### Updating the pinned Rust version
+
+The Rust toolchain is pinned in `rust-toolchain.toml` to ensure reproducible builds across all developers and CI. To update it:
+
+1. Edit `rust-toolchain.toml` and change `channel` to the new version (e.g. `"1.83.0"`).
+2. Run `cargo check --workspace` to confirm everything compiles on the new version.
+3. Update the version reference in `README.md` and this file to match.
+4. Open a PR with the toolchain bump — CI will validate it against all targets.
 
 ---
 
@@ -129,6 +198,8 @@ Additional conventions:
 ---
 
 ## Adding a New Contract Template
+
+For the full step-by-step guide, see [docs/adding-a-contract.md](docs/adding-a-contract.md).
 
 Follow these steps to add a contract that fits the existing project structure:
 

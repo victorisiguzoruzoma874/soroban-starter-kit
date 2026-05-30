@@ -41,7 +41,13 @@ docker build -f docker/Dockerfile --target prod -t fidelis:prod .
 
 ## Local Stellar Network
 
+### Starting the node
+
 ```bash
+# Start only the Stellar/Soroban node
+docker compose -f docker/docker-compose.yml up stellar-node
+
+# Or use the helper script (starts node and waits for healthy status)
 ./scripts/local-net.sh start    # start node, wait for healthy
 ./scripts/local-net.sh status   # check status
 ./scripts/local-net.sh reset    # wipe chain data and restart
@@ -49,11 +55,29 @@ docker build -f docker/Dockerfile --target prod -t fidelis:prod .
 ./scripts/local-net.sh logs     # tail logs
 ```
 
+### Waiting for readiness
+
+The node takes ~30 seconds to initialize. Use `scripts/wait-for-node.sh` to block until the Soroban RPC endpoint is accepting requests:
+
+```bash
+# Default: polls http://localhost:8000/soroban/rpc, waits up to 120s
+./scripts/wait-for-node.sh
+
+# Custom URL and timeout
+./scripts/wait-for-node.sh http://localhost:8000/soroban/rpc 180
+```
+
+The script exits 0 when the node is healthy and 1 if it times out, making it safe to use in CI and deployment pipelines.
+
+### Health check
+
+The `stellar-node` service in `docker/docker-compose.yml` includes a built-in health check that queries `POST /soroban/rpc` with `getHealth`. Docker marks the container healthy only after the RPC responds with `"healthy"`, so dependent services (`frontend`, `contracts`) will not start until the node is ready.
+
 Endpoints when running locally:
 
 | Service | URL |
 |---------|-----|
-| Soroban RPC | http://localhost:8000 |
+| Soroban RPC | http://localhost:8000/soroban/rpc |
 | Horizon API | http://localhost:8001 |
 
 Set `VITE_STELLAR_NETWORK=local` in `.env` to point the frontend at the local node.

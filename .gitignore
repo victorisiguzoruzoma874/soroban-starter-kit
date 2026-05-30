@@ -1,19 +1,24 @@
 # Rust
 target/
 **/*.rs.bk
+**/test_snapshots/
+**/proptest-regressions/
 
 # Environment
 .env
 .env.*
 !.env.example
+.contract-ids
 
 # OS
 .DS_Store
 Thumbs.db
 *.log
 
+# Generated TypeScript bindings
+sdk/
+
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
