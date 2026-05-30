@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Build and Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install Stellar CLI
+        run: cargo install --locked stellar-cli --features opt
+
+      - name: Build all contracts (release)
+        run: |
+          for dir in contracts/*/; do
+            if [ -f "$dir/Cargo.toml" ]; then
+              echo "Building $(basename $dir)..."
+              stellar contract build --manifest-path "$dir/Cargo.toml"
+            fi
+          done
+
+      - name: Calculate SHA256 checksums
+        run: |
+          cd target/wasm32-unknown-unknown/release
+          sha256sum *.wasm > checksums.sha256
+          cat checksums.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            target/wasm32-unknown-unknown/release/*.wasm
+            target/wasm32-unknown-unknown/release/checksums.sha256
+          generate_release_notes: true

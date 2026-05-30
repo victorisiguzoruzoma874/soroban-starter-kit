@@ -4,6 +4,87 @@ Step-by-step instructions for deploying Soroban contracts and the frontend acros
 
 ---
 
+## Prerequisites
+
+### Install Stellar CLI
+
+The Stellar CLI is required to generate identities, fund accounts, and deploy contracts.
+
+```bash
+# Install Stellar CLI
+cargo install --locked stellar-cli --features opt
+
+# Verify installation
+stellar --version
+```
+
+**Expected output:**
+```
+stellar 21.x.x
+```
+
+### Generate a Stellar CLI Identity
+
+Create a new identity for contract deployment:
+
+```bash
+# Generate a new identity (interactive)
+stellar keys generate --global deployer
+
+# Or generate non-interactively
+stellar keys generate deployer --network testnet
+```
+
+**Expected output:**
+```
+Created identity "deployer" with public key: GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+The secret key is stored securely in `~/.stellar/keys.yaml` (never commit this file).
+
+### Fund Your Account on Testnet
+
+Use Friendbot to fund your testnet account with 10,000 XLM:
+
+```bash
+# Fund the deployer account
+stellar keys fund deployer --network testnet
+```
+
+**Expected output:**
+```
+Funded account GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX with 10000 XLM
+```
+
+Verify the account is funded:
+
+```bash
+stellar account info --source-account deployer --network testnet
+```
+
+**Expected output:**
+```
+Account ID: GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Sequence: 0
+Balances:
+  10000.0000000 XLM
+```
+
+### Verify Stellar CLI Configuration
+
+Check that your identity is properly configured:
+
+```bash
+stellar keys list
+```
+
+**Expected output:**
+```
+deployer (testnet)
+```
+
+---
+
 ## Environments
 
 | Environment | Network | RPC URL |
@@ -71,19 +152,92 @@ npm run dev
 
 ## 3. Testnet Deployment
 
+### Step 1: Ensure Your Identity is Funded
+
+Verify your deployer account has sufficient XLM:
+
 ```bash
-# Fund your deployer account (testnet only)
-stellar keys generate --global deployer
+stellar account info --source-account deployer --network testnet
+```
+
+If the account shows 0 XLM, fund it via Friendbot:
+
+```bash
 stellar keys fund deployer --network testnet
+```
 
-# Deploy all contracts
+### Step 2: Deploy Contracts
+
+Deploy all contracts:
+
+```bash
 ./scripts/deploy.sh testnet
+```
 
-# Deploy a single contract
+Deploy a single contract:
+
+```bash
+./scripts/deploy.sh testnet token
+# or
 ./scripts/deploy.sh testnet escrow
 ```
 
-Save the contract IDs printed to stdout — you'll need them in `.env`.
+**Expected output:**
+```
+Building token contract...
+Deploying token contract to testnet...
+Contract ID: CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+Admin: GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Step 3: Save Contract IDs
+
+Save the contract IDs printed to stdout — you'll need them in `.env`:
+
+```env
+VITE_TOKEN_CONTRACT_ID=CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+VITE_ESCROW_CONTRACT_ID=CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Step 4: Verify Deployment
+
+Verify the contract is deployed and responsive:
+
+```bash
+stellar contract info --id <CONTRACT_ID> --network testnet
+```
+
+**Expected output:**
+```
+Contract ID: CXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+WASM Hash: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+---
+
+## 3b. Post-Deploy Initialization
+
+After deploying contracts, run the initialization script to call each contract's `initialize` function:
+
+```bash
+# Populate .contract-ids with deployed IDs (one per line: name=CONTRACT_ID)
+echo "token=CABC..." >> .contract-ids
+echo "escrow=CDEF..." >> .contract-ids
+
+# Initialize all contracts on the current network
+./scripts/initialize.sh testnet   # or local / mainnet
+```
+
+**Environment variable overrides:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `INIT_FN` | `initialize` | Function name to invoke |
+| `SOURCE_ACCOUNT` | `default` | Stellar key to sign transactions |
+| `CONTRACT_IDS_FILE` | `.contract-ids` | Path to contract ID list |
+| `INIT_ARGS_<NAME>` | _(none)_ | Extra CLI args for a specific contract, e.g. `INIT_ARGS_TOKEN="--admin GABC..."` |
+
+The script is idempotent: contracts that return an "already initialized" error are reported as skipped rather than failures.
 
 ---
 
@@ -280,10 +434,22 @@ upgrade as complete.
 
 ## 12. Troubleshooting
 
+### Identity and Funding Issues
+
+| Problem | Solution |
+|---------|----------|
+| `stellar: command not found` | Install Stellar CLI: `cargo install --locked stellar-cli --features opt` |
+| `Identity "deployer" not found` | Generate identity: `stellar keys generate --global deployer` |
+| `Account not found` | Fund account via Friendbot: `stellar keys fund deployer --network testnet` |
+| `Insufficient balance for fees` | Verify funding: `stellar account info --source-account deployer --network testnet` |
+| `Friendbot rate limit exceeded` | Wait 5 minutes and retry, or use a different account |
+| `Invalid network passphrase` | Ensure `.env` has correct `VITE_NETWORK_PASSPHRASE` for the target network |
+
+### Deployment Issues
+
 | Problem | Solution |
 |---------|----------|
 | `wasm32` target missing | `rustup target add wasm32-unknown-unknown` |
-| `stellar` not found | `cargo install --locked stellar-cli --features opt` |
 | Deploy fails: insufficient fee | Increase fee in `deploy.sh` or fund account |
 | Local node unhealthy | `./scripts/local-net.sh reset` then retry |
 | Contract already initialized | Deploy a fresh contract; initialization is one-time |
