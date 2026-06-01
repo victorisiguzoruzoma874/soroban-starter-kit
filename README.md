@@ -12,15 +12,26 @@ A curated collection of production-ready Soroban smart contract templates. These
 git clone https://github.com/your-username/soroban-contract-templates.git
 cd soroban-contract-templates
 
-# Build a contract from the repo root (example: token)
-stellar contract build --manifest-path contracts/token/Cargo.toml
-# Alternatively: cd contracts/token && stellar contract build
-
-# Deploy to testnet
-./scripts/deploy.sh testnet
+# Build all contracts
+make build
 
 # Run tests
-cargo test
+make test
+
+# Deploy to testnet
+make deploy-testnet
+
+# See all available commands
+make help
+```
+
+Or use `just` (see [dev-environment.md](docs/dev-environment.md) for installation):
+
+```bash
+just build
+just test
+just deploy-testnet
+just --list
 ```
 
 ## 📦 Contract Templates

@@ -20,6 +20,8 @@
     "vscode": {
       "extensions": [
         "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
         "ms-azuretools.vscode-docker"
       ],
       "settings": {
