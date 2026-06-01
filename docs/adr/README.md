@@ -12,6 +12,7 @@ Each ADR documents a significant design decision: the context that motivated it,
 | [0002](0002-error-handling-strategy.md) | Error Handling Strategy | Accepted |
 | [0003](0003-admin-model.md) | Admin Model | Accepted |
 | [0004](0004-escrow-state-machine.md) | Escrow State Machine Design | Accepted |
+| [0005](0005-feature-flags.md) | Feature Flag Design | Accepted |
 | [0006](0006-escrow-arbiter-model.md) | Escrow Arbiter Model | Accepted |
 | [0007](0007-token-interface-compliance.md) | Token Interface Compliance | Accepted |
 
