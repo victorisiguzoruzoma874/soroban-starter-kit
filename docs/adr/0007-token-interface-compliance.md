@@ -9,7 +9,7 @@ The `contracts/token` implementation in this repo implements `soroban_sdk::token
 
 ## Decision
 
-Document the contract as compliant with the Soroban SDK token interface (`soroban_sdk::token::TokenInterface`). There is no single formal SEP number for the Soroban token interface at the time of this ADR; instead this ADR records the contract's compliance checklist, deviations, and verification steps.
+Document the contract as compliant with the Soroban SDK token interface (`soroban_sdk::token::TokenInterface`). This implementation aligns with SEP-41 token transfer semantics as referenced in the project changelog. At the time of this ADR, the Soroban token interface is exercised through the SDK trait rather than a single canonical SEP document; this ADR records the compliance checklist, deviations, and verification steps.
 
 ## Compliance checklist
 

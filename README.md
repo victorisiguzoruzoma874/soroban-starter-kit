@@ -135,7 +135,8 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 - [Freighter Wallet](https://freighter.app/)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [Security Best Practices](docs/security.md)
- - [Architecture Decision Records](docs/adr/README.md)
+- [Token Interface Compliance ADR](docs/adr/0007-token-interface-compliance.md)
+- [Architecture Decision Records](docs/adr/README.md)
 
 ## 📄 License
 
