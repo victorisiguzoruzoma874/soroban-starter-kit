@@ -295,7 +295,6 @@ impl TokenContract {
     /// # Errors
     ///
     /// Returns [`TokenError::Unauthorized`] if the caller is not the current admin.
-    pub fn cancel_admin_transfer(env: Env) -> Result<(), TokenError> {
     pub fn cancel_admin_proposal(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -319,11 +318,10 @@ impl TokenContract {
 
     /// Return the current admin address.
     ///
-    /// # Panics
+    /// # Errors
     ///
-    /// Panics if the contract has not been initialized.
+    /// Returns [`TokenError::NotInitialized`] if the contract has not been initialized.
     #[must_use]
-    pub fn admin(env: Env) -> Address {
     pub fn admin(env: Env) -> Result<Address, TokenError> {
         env.storage()
             .instance()

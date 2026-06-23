@@ -10,21 +10,10 @@ mod storage;
 pub use errors::EscrowError;
 pub use storage::{DataKey, EscrowInfo, EscrowState};
 
-use storage::DataKey::{Arbiter, Amount, Buyer, Deadline, Seller, State, TokenContract, BuyerApproved, SellerDelivered};
+#[cfg(feature = "pausable")]
 use admin::require_admin;
-use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
+use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
 use storage::DataKey::*;
-
-/// Minimum number of ledgers the deadline must be in the future.
-const MIN_DEADLINE_BUFFER: u32 = 10;
-use soroban_common::MIN_DEADLINE_BUFFER;
-use storage::DataKey::*;
-
-/// Extend storage TTL when remaining ledgers fall below this threshold.
-const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
-
-/// Target TTL (in ledgers) after each extension.
-const LEDGER_BUMP_AMOUNT: u32 = 518_400;
 
 fn bump_instance(env: &Env) {
     env.storage()
@@ -91,8 +80,6 @@ impl EscrowContract {
         env.storage().instance().set(&Amount, &amount);
         env.storage().instance().set(&Deadline, &deadline_ledger);
         env.storage().instance().set(&State, &EscrowState::Created);
-        env.storage().instance().set(&BuyerApproved, &false);
-        env.storage().instance().set(&SellerDelivered, &false);
         // Default to single-sig (1-of-1)
         env.storage().instance().set(&RequiredSignatures, &1u32);
 
@@ -104,16 +91,6 @@ impl EscrowContract {
         Ok(())
     }
 
-    /// Buyer funds the escrow by transferring tokens to the contract.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
-    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Created` state.
-    /// Returns [`EscrowError::InsufficientFunds`] if the buyer's balance is less than the escrow amount.
-    pub fn fund(env: Env) -> Result<(), EscrowError> {
-        #[cfg(feature = "pausable")]
-        Self::require_not_paused(&env)?;
     /// Initialize a new escrow with multi-sig arbiter support. Must be called exactly once.
     ///
     /// Allows specifying multiple arbiters and requiring N-of-M signatures for resolution.
@@ -161,8 +138,6 @@ impl EscrowContract {
         env.storage().instance().set(&Amount, &amount);
         env.storage().instance().set(&Deadline, &deadline_ledger);
         env.storage().instance().set(&State, &EscrowState::Created);
-        env.storage().instance().set(&BuyerApproved, &false);
-        env.storage().instance().set(&SellerDelivered, &false);
 
         bump_instance(&env);
 
@@ -207,6 +182,12 @@ impl EscrowContract {
     }
 
     /// Buyer funds the escrow by transferring tokens to the contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Created` state.
+    /// Returns [`EscrowError::InsufficientFunds`] if the buyer's balance is less than the escrow amount.
     pub fn fund(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -280,14 +261,6 @@ impl EscrowContract {
         Self::release_to_seller(env)
     }
 
-    /// Buyer requests a refund after the deadline has passed.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
-    /// Returns [`EscrowError::DeadlineNotReached`] if the deadline has not yet passed.
-    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Funded` or `Delivered` state.
-    pub fn request_refund(env: Env) -> Result<(), EscrowError> {
     /// Buyer releases a partial amount to the seller (milestone-based payments).
     /// Only callable in `Funded` state. Decrements the stored amount.
     pub fn release_partial(env: Env, amount: i128) -> Result<(), EscrowError> {
@@ -331,6 +304,12 @@ impl EscrowContract {
     }
 
     /// Buyer requests a refund after the deadline has passed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
+    /// Returns [`EscrowError::DeadlineNotReached`] if the deadline has not yet passed.
+    /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Funded` or `Delivered` state.
     pub fn request_refund(env: Env) -> Result<(), EscrowError> {
         #[cfg(feature = "pausable")]
         Self::require_not_paused(&env)?;
@@ -390,22 +369,14 @@ impl EscrowContract {
     /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
     /// Returns [`EscrowError::InvalidState`] if the escrow is not in the `Disputed` state.
     pub fn resolve_dispute(env: Env, release_to_seller: bool) -> Result<(), EscrowError> {
-        let arbiter: Address = Self::get_required(&env, &Arbiter)?;
-        arbiter.require_auth();
-
         let state: EscrowState = Self::get_required(&env, &State)?;
-        let state: EscrowState = env
-            .storage()
-            .instance()
-            .get(&State)
-            .ok_or(EscrowError::NotInitialized)?;
         if state != EscrowState::Disputed {
             return Err(EscrowError::InvalidState);
         }
 
         // Check if using multi-sig arbiters
         let arbiters_opt: Option<soroban_sdk::Vec<Address>> = env.storage().instance().get(&DataKey::Arbiters);
-        
+
         if let Some(arbiters) = arbiters_opt {
             // Multi-sig mode
             let required_sigs: u32 = env
@@ -413,18 +384,18 @@ impl EscrowContract {
                 .instance()
                 .get(&DataKey::RequiredSignatures)
                 .unwrap_or(1);
-            
+
             let mut votes: soroban_sdk::Vec<Address> = env
                 .storage()
                 .instance()
                 .get(&DataKey::ArbiterVotes)
                 .unwrap_or_else(|| soroban_sdk::Vec::new(&env));
-            
+
             // Find the first arbiter that authorizes and add to votes
             let mut caller_found = false;
             for arbiter in arbiters.iter() {
                 arbiter.require_auth();
-                
+
                 // Add this arbiter to votes if not already there
                 let mut already_voted = false;
                 for vote in votes.iter() {
@@ -433,20 +404,20 @@ impl EscrowContract {
                         break;
                     }
                 }
-                
+
                 if !already_voted {
                     votes.push_back(arbiter.clone());
                 }
                 caller_found = true;
                 break;
             }
-            
+
             if !caller_found {
                 return Err(EscrowError::NotAuthorized);
             }
-            
+
             env.storage().instance().set(&DataKey::ArbiterVotes, &votes);
-            
+
             // Check if we have enough signatures
             if votes.len() as u32 >= required_sigs {
                 env.storage().instance().remove(&DataKey::ArbiterVotes);
@@ -560,29 +531,12 @@ impl EscrowContract {
         Ok(())
     }
 
-    /// Return full escrow details as an [`EscrowInfo`] struct, or `None` if not initialized.
-    #[must_use]
-    pub fn get_escrow_info(env: Env) -> Option<EscrowInfo> {
-        Some(EscrowInfo {
-            buyer: env.storage().instance().get(&Buyer)?,
-            seller: env.storage().instance().get(&Seller)?,
-            arbiter: env.storage().instance().get(&Arbiter)?,
-            token_contract: env.storage().instance().get(&TokenContract)?,
-            amount: env.storage().instance().get(&Amount)?,
-            deadline: env.storage().instance().get(&Deadline)?,
-            state: env.storage().instance().get(&State)?,
     /// Return full escrow details as an [`EscrowInfo`] struct.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EscrowError::NotInitialized`] if the contract has not been initialized.
     #[must_use]
-    pub fn get_escrow_info(env: Env) -> EscrowInfo {
-        EscrowInfo {
-            buyer: env.storage().instance().get(&Buyer).unwrap(),
-            seller: env.storage().instance().get(&Seller).unwrap(),
-            arbiter: env.storage().instance().get(&Arbiter).unwrap(),
-            token_contract: env.storage().instance().get(&TokenContract).unwrap(),
-            amount: env.storage().instance().get(&Amount).unwrap(),
-            deadline: env.storage().instance().get(&Deadline).unwrap(),
-            state: env.storage().instance().get(&State).unwrap(),
-        }
     pub fn get_escrow_info(env: Env) -> Result<EscrowInfo, EscrowError> {
         Ok(EscrowInfo {
             buyer: Self::get_required(&env, &Buyer)?,
@@ -763,8 +717,7 @@ impl EscrowContract {
 
         admin::transfer_token(&env, &env.current_contract_address(), &buyer, amount);
 
-        env.events()
-            .publish((Symbol::new(&env, "funds_refunded"), buyer), amount);
+        events::funds_refunded(&env, &buyer, amount);
 
         Ok(())
     }

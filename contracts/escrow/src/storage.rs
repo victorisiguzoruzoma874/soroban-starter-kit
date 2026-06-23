@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address, Vec};
+use soroban_sdk::{contracttype, Address};
 
 /// Top-level storage keys used by [`EscrowContract`](crate::EscrowContract).
 ///
