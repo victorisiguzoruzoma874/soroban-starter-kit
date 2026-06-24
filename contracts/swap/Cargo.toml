@@ -1,0 +1,25 @@
+[package]
+name = "soroban-swap-template"
+version = "0.1.0"
+edition = "2021"
+authors.workspace = true
+description = "A production-ready Soroban atomic token swap contract template"
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+soroban-common = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+
+[[bin]]
+name = "deploy"
+path = "src/bin/deploy.rs"
+doc = false
+
+[lints]
+workspace = true
