@@ -528,6 +528,48 @@ suitable for use in CI/CD pipelines.
 
 ---
 
+## 14. Escrow Status Monitoring
+
+After deploying an escrow contract, use `scripts/monitor-escrow.sh` to check its current state at any time:
+
+```bash
+./scripts/monitor-escrow.sh [network] <CONTRACT_ID>
+```
+
+### Example
+
+```bash
+./scripts/monitor-escrow.sh testnet CABC123...
+
+# Output:
+# Escrow Monitor — CABC123...
+# Network: testnet  RPC: https://soroban-testnet.stellar.org
+# ────────────────────────────────────────────────────
+# State:          Funded
+#
+# Buyer:          GABC...
+# Seller:         GDEF...
+# Arbiter:        GHIJ...
+#
+# Amount:         1000000000 (base units)
+# Deadline:       ledger 5432100
+# Time remaining: 2d 3h 45m remaining
+# ────────────────────────────────────────────────────
+```
+
+### State color coding
+
+| Color | States |
+|-------|--------|
+| Green | `Completed` |
+| Yellow | `Funded`, `Delivered` |
+| Red | `Disputed`, `Cancelled` |
+| Cyan | `Created`, `Refunded` |
+
+The script also prints a warning when the deadline has passed and funds are still locked.
+
+---
+
 ## Resources
 
 - [Stellar CLI Reference](https://developers.stellar.org/docs/tools/stellar-cli)

@@ -1,0 +1,287 @@
+# Contract Monitoring Guide
+
+How to index events, detect anomalies, and set up alerting for deployed Soroban contracts.
+
+---
+
+## 1. Overview
+
+Soroban contracts emit structured events that can be consumed by off-chain indexers, dashboards, and alerting systems. This guide covers the full monitoring stack:
+
+- Subscribing to events via Stellar Horizon
+- Understanding the event schema for token and escrow contracts
+- Detecting anomalies in on-chain activity
+- Recommended alerting thresholds
+- Tooling: Stellar Expert, Horizon, and custom indexers
+
+---
+
+## 2. Subscribing to Contract Events via Stellar Horizon
+
+Horizon exposes a streaming endpoint for contract events using Server-Sent Events (SSE).
+
+### REST (paginated)
+
+```bash
+curl "https://horizon-testnet.stellar.org/contracts/<CONTRACT_ID>/events?limit=200&order=asc&cursor=now"
+```
+
+### SSE (streaming)
+
+```bash
+curl -N "https://horizon-testnet.stellar.org/contracts/<CONTRACT_ID>/events?cursor=now" \
+  -H "Accept: text/event-stream"
+```
+
+### JavaScript (SDK)
+
+```ts
+import { Horizon } from '@stellar/stellar-sdk';
+
+const server = new Horizon.Server('https://horizon-testnet.stellar.org');
+
+server.contractEvents(CONTRACT_ID)
+  .cursor('now')
+  .stream({
+    onmessage: (event) => {
+      console.log('Contract event:', event);
+    },
+    onerror: (err) => {
+      console.error('Stream error:', err);
+    },
+  });
+```
+
+### Filtering by event topic
+
+Horizon supports `topic` query parameters to narrow the event stream. Topics are XDR-encoded; use the Stellar SDK to construct filters:
+
+```ts
+import { xdr, nativeToScVal } from '@stellar/stellar-sdk';
+
+// Only stream 'transfer' events
+const topicFilter = xdr.ScVal.scvSymbol('transfer').toXDR('base64');
+
+const url = `https://horizon-testnet.stellar.org/contracts/${CONTRACT_ID}/events`
+          + `?topic1=${encodeURIComponent(topicFilter)}&cursor=now`;
+```
+
+---
+
+## 3. Event Schema
+
+### Token Contract Events
+
+All token events are emitted by `contracts/token` and follow this structure:
+
+| Event | Topic[0] | Topic[1] | Topic[2] | Data |
+|-------|----------|----------|----------|------|
+| `initialized` | `Symbol("initialized")` | `Address` (admin) | — | `(String name, String symbol, u32 decimals)` |
+| `mint` | `Symbol("mint")` | `Address` (recipient) | — | `i128` (amount) |
+| `burn` | `Symbol("burn")` | `Address` (account) | — | `i128` (amount) |
+| `transfer` | `Symbol("transfer")` | `Address` (from) | `Address` (to) | `i128` (amount) |
+| `approve` | `Symbol("approve")` | `Address` (owner) | `Address` (spender) | `i128` (amount) |
+| `revoke` | `Symbol("revoke")` | `Address` (owner) | `Address` (spender) | `()` |
+| `admin_changed` | `Symbol("admin_changed")` | `Address` (old admin) | — | `Address` (new admin) |
+| `admin_proposed` | `Symbol("admin_proposed")` | `Address` (current admin) | — | `Address` (pending admin) |
+| `admin_accepted` | `Symbol("admin_accepted")` | `Address` (new admin) | — | `()` |
+| `paused` | `Symbol("paused")` | `Address` (admin) | — | `()` |
+| `unpaused` | `Symbol("unpaused")` | `Address` (admin) | — | `()` |
+| `upgraded` | `Symbol("upgraded")` | `Address` (admin) | — | `BytesN<32>` (wasm hash) |
+
+### Escrow Contract Events
+
+All escrow events are emitted by `contracts/escrow`:
+
+| Event | Topic[0] | Topic[1] | Topic[2] | Topic[3] | Data |
+|-------|----------|----------|----------|----------|------|
+| `initialized` | `Symbol("initialized")` | `Address` (buyer) | `Address` (seller) | `Address` (arbiter) | `i128` (amount) |
+| `escrow_created` | `Symbol("escrow_created")` | `Address` (buyer) | `Address` (seller) | — | `i128` (amount) |
+| `escrow_funded` | `Symbol("escrow_funded")` | `Address` (buyer) | — | — | `i128` (amount) |
+| `delivery_marked` | `Symbol("delivery_marked")` | `Address` (seller) | — | — | `()` |
+| `funds_released` | `Symbol("funds_released")` | `Address` (seller) | — | — | `i128` (amount) |
+| `partial_release` | `Symbol("partial_release")` | `Address` (seller) | — | — | `i128` (amount) |
+| `funds_refunded` | `Symbol("funds_refunded")` | `Address` (buyer) | — | — | `i128` (amount) |
+| `dispute_raised` | `Symbol("dispute_raised")` | `Address` (caller) | — | — | `()` |
+| `amount_updated` | `Symbol("amount_updated")` | `Address` (buyer) | — | — | `i128` (new amount) |
+| `deadline_extended` | `Symbol("deadline_extended")` | `Address` (buyer) | — | — | `u32` (new deadline) |
+| `paused` | `Symbol("paused")` | `Address` (admin) | — | — | `()` |
+| `unpaused` | `Symbol("unpaused")` | `Address` (admin) | — | — | `()` |
+| `upgraded` | `Symbol("upgraded")` | `Address` (admin) | — | — | `BytesN<32>` (wasm hash) |
+
+### Subscription Contract Events
+
+Events emitted by `contracts/subscription`:
+
+| Event | Topic[0] | Topic[1] | Topic[2] | Data |
+|-------|----------|----------|----------|------|
+| `initialized` | `Symbol("initialized")` | `Address` (provider) | — | `Address` (token) |
+| `subscribed` | `Symbol("subscribed")` | `Address` (subscriber) | — | `(i128 amount, u32 interval_ledgers)` |
+| `charged` | `Symbol("charged")` | `Address` (subscriber) | `Address` (provider) | `i128` (amount) |
+| `cancelled` | `Symbol("cancelled")` | `Address` (subscriber) | — | `()` |
+
+---
+
+## 4. Decoding Events
+
+Events are XDR-encoded on-chain. Use the Stellar CLI or SDK to decode them.
+
+### Stellar CLI
+
+```bash
+# Decode a raw XDR event value
+stellar xdr decode --type ScVal --xdr <BASE64_XDR>
+
+# Fetch and decode the last 20 events for a contract
+stellar contract events \
+  --id <CONTRACT_ID> \
+  --network testnet \
+  --output json | jq .
+```
+
+### JavaScript SDK
+
+```ts
+import { xdr } from '@stellar/stellar-sdk';
+
+function decodeTopics(rawTopics: string[]): any[] {
+  return rawTopics.map((t) => xdr.ScVal.fromXDR(t, 'base64'));
+}
+
+function decodeData(rawData: string): any {
+  return xdr.ScVal.fromXDR(rawData, 'base64');
+}
+```
+
+---
+
+## 5. Indexing Events with a Custom Indexer
+
+For production systems, pull events in batches and store them in a database for fast queries.
+
+### Polling architecture
+
+```
+Horizon → Batch poller (every N seconds) → Database → API / alerts
+```
+
+### Example batch poller (TypeScript)
+
+```ts
+import { Horizon } from '@stellar/stellar-sdk';
+import { xdr } from '@stellar/stellar-sdk';
+
+const server = new Horizon.Server('https://horizon-testnet.stellar.org');
+let cursor = 'now';
+
+async function pollEvents(contractId: string) {
+  const page = await server
+    .contractEvents(contractId)
+    .cursor(cursor)
+    .limit(200)
+    .call();
+
+  for (const record of page.records) {
+    const eventName = xdr.ScVal.fromXDR(record.topic[0], 'base64').sym().toString();
+    cursor = record.pagingToken;
+    await storeEvent({ contractId, eventName, record });
+  }
+}
+
+setInterval(() => pollEvents('<CONTRACT_ID>'), 5_000);
+```
+
+### Recommended database schema
+
+```sql
+CREATE TABLE contract_events (
+  id            BIGSERIAL PRIMARY KEY,
+  contract_id   TEXT NOT NULL,
+  ledger        BIGINT NOT NULL,
+  event_name    TEXT NOT NULL,
+  topic1        TEXT,
+  topic2        TEXT,
+  topic3        TEXT,
+  data          TEXT,
+  paging_token  TEXT UNIQUE NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX ON contract_events (contract_id, event_name);
+CREATE INDEX ON contract_events (ledger);
+```
+
+---
+
+## 6. Monitoring with Stellar Expert
+
+[Stellar Expert](https://stellar.expert/explorer/testnet) provides a hosted explorer with contract event history, no setup required.
+
+1. Navigate to `https://stellar.expert/explorer/testnet/contract/<CONTRACT_ID>`
+2. Click the **Events** tab to view raw event history
+3. Use the search bar to filter by event name or involved address
+4. Subscribe to email or webhook alerts via the Stellar Expert notification API
+
+---
+
+## 7. Anomaly Detection
+
+Monitor these patterns to detect unexpected contract behavior:
+
+### Token contract anomalies
+
+| Signal | Detection | Threshold |
+|--------|-----------|-----------|
+| Large mint | `mint` event with data > expected cap | Alert if `amount > MAX_MINT_AMOUNT` |
+| Mint to unknown address | `mint` event with unknown `to` | Alert if `to` not in whitelist |
+| Admin changed unexpectedly | `admin_changed` event | Alert on every occurrence |
+| Abnormal burn rate | Rate of `burn` events | Alert if rate > 3× 7-day average |
+| Upgrade proposed | `upgrade_proposed` event | Alert immediately; review wasm hash |
+
+### Escrow contract anomalies
+
+| Signal | Detection | Threshold |
+|--------|-----------|-----------|
+| Dispute spike | Rate of `dispute_raised` events | Alert if rate > 5% of funded escrows |
+| Large refund | `funds_refunded` with high amount | Alert if `amount > HIGH_VALUE_THRESHOLD` |
+| Stalled escrow | Escrow in `Funded` state past deadline | Alert 24 h before deadline |
+| Upgrade proposed | `upgrade_proposed` event | Alert immediately |
+| Repeated cancellations | `escrow_cancelled` from the same buyer | Alert if > 3 in 24 h |
+
+---
+
+## 8. Recommended Alerting Thresholds
+
+Adjust these defaults for your specific deployment:
+
+| Metric | Warning | Critical |
+|--------|---------|----------|
+| Events processed per minute | < 10 (processing lag) | 0 (indexer down) |
+| Dispute rate | > 2% of active escrows | > 10% |
+| Failed charges (subscription) | > 5% of subscribers | > 20% |
+| Single transaction value | > $10,000 equivalent | > $100,000 equivalent |
+| Upgrade timelock remaining | < 12 h | 0 (executing immediately) |
+| Consecutive `admin_changed` | ≥ 1 | ≥ 2 in 1 h |
+
+---
+
+## 9. Health Check Script
+
+Use the provided script to quickly poll contract state from the CLI:
+
+```bash
+# Check escrow status
+./scripts/monitor-escrow.sh testnet <ESCROW_CONTRACT_ID>
+```
+
+See [`scripts/monitor-escrow.sh`](../scripts/monitor-escrow.sh) for details.
+
+---
+
+## 10. Resources
+
+- [Horizon Events API](https://developers.stellar.org/docs/data/horizon/api-reference/resources/get-events-by-contract-id)
+- [Stellar CLI contract events](https://developers.stellar.org/docs/tools/stellar-cli)
+- [Stellar Expert Explorer](https://stellar.expert)
+- [soroban-sdk event docs](https://docs.rs/soroban-sdk/latest/soroban_sdk/struct.Events.html)
+- [XDR types reference](https://developers.stellar.org/docs/learn/fundamentals/transactions/list-of-operations)
