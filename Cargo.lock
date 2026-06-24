@@ -1490,6 +1490,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-subscription-template"
+version = "0.1.0"
+dependencies = [
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-token-fuzz"
 version = "0.1.0"
 dependencies = [

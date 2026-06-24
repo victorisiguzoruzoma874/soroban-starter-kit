@@ -113,7 +113,296 @@ contract.call('refund', escrowIdScVal);
 
 ---
 
-## 8. Event Topic Convention
+## 8. Events Reference
+
+This section documents the exact XDR types for every event emitted by the token and escrow contracts. Indexers must decode topics and data from on-chain XDR to reconstruct event payloads.
+
+### Type Encoding Reference
+
+| Soroban Type | XDR ScVal Variant | Notes |
+|---|---|---|
+| `Symbol` | `ScvSymbol` | Up to 32 ASCII chars |
+| `Address` | `ScvAddress` → `ScvAccountId` or `ScvContractId` | 32-byte public key or contract hash |
+| `i128` | `ScvI128` → `{ hi: i64, lo: u64 }` | 128-bit signed integer |
+| `u32` | `ScvU32` | 32-bit unsigned integer |
+| `BytesN<32>` | `ScvBytes` | Fixed 32-byte array (WASM hash) |
+| `String` | `ScvString` | UTF-8 bytes |
+| `()` (unit) | `ScvVoid` | Empty data payload |
+| Tuple `(A, B)` | `ScvVec([A, B])` | Ordered vector of ScVals |
+
+### Token Contract — Event Details
+
+#### `initialized`
+
+Emitted once when the token is first configured.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"initialized"` | topic[0] | `ScvSymbol` | Event name |
+| admin | topic[1] | `ScvAddress` | Account that initialized the contract |
+| name | data[0] | `ScvString` | Token name (e.g. `"MyToken"`) |
+| symbol | data[1] | `ScvString` | Token ticker symbol (e.g. `"MTK"`) |
+| decimals | data[2] | `ScvU32` | Number of decimal places |
+
+Example (testnet, base64 XDR — illustrative):
+```
+topic[0]: AAAABS5pbml0aWFsaXplZA==   # ScvSymbol("initialized")
+topic[1]: AAAAA...                    # ScvAddress(admin_pubkey)
+data:     AAAAEQAAAAcAAAABTXlUb2tlbg== # ScvVec(["MyToken", "MTK", 7])
+```
+
+---
+
+#### `mint`
+
+Emitted when new tokens are created and assigned to a recipient.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"mint"` | topic[0] | `ScvSymbol` | Event name |
+| to | topic[1] | `ScvAddress` | Recipient address |
+| amount | data | `ScvI128` | Tokens minted in base units |
+
+Example:
+```
+topic[0]: AAAABS5taW50          # ScvSymbol("mint")
+topic[1]: AAAAA...              # ScvAddress(recipient)
+data:     AAAADgAAAAAAAAAAAAAAAABiO8A=  # ScvI128(10_000_000, at 7 decimals = 1 token)
+```
+
+---
+
+#### `burn`
+
+Emitted when tokens are removed from circulation.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"burn"` | topic[0] | `ScvSymbol` | Event name |
+| from | topic[1] | `ScvAddress` | Account whose tokens are burned |
+| amount | data | `ScvI128` | Tokens burned in base units |
+
+---
+
+#### `transfer`
+
+Emitted on every direct token transfer.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"transfer"` | topic[0] | `ScvSymbol` | Event name |
+| from | topic[1] | `ScvAddress` | Sender address |
+| to | topic[2] | `ScvAddress` | Receiver address |
+| amount | data | `ScvI128` | Transferred amount in base units |
+
+---
+
+#### `approve`
+
+Emitted when an owner grants a spender an allowance.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"approve"` | topic[0] | `ScvSymbol` | Event name |
+| from | topic[1] | `ScvAddress` | Owner granting the allowance |
+| spender | topic[2] | `ScvAddress` | Account receiving the allowance |
+| amount | data | `ScvI128` | Allowance amount in base units |
+
+---
+
+#### `revoke`
+
+Emitted when an existing allowance is revoked.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"revoke"` | topic[0] | `ScvSymbol` | Event name |
+| from | topic[1] | `ScvAddress` | Owner revoking the allowance |
+| spender | topic[2] | `ScvAddress` | Account losing the allowance |
+| (void) | data | `ScvVoid` | No data payload |
+
+---
+
+#### `admin_changed`
+
+Emitted immediately when the admin key is rotated.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"admin_changed"` | topic[0] | `ScvSymbol` | Event name |
+| old_admin | topic[1] | `ScvAddress` | Previous admin address |
+| new_admin | data | `ScvAddress` | Newly assigned admin address |
+
+---
+
+#### `admin_proposed`
+
+Emitted when a new admin candidate is nominated via the two-step rotation flow.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"admin_proposed"` | topic[0] | `ScvSymbol` | Event name |
+| current_admin | topic[1] | `ScvAddress` | Current admin proposing the change |
+| pending_admin | data | `ScvAddress` | Nominated candidate |
+
+---
+
+#### `admin_accepted`
+
+Emitted when the pending admin accepts the role.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"admin_accepted"` | topic[0] | `ScvSymbol` | Event name |
+| new_admin | topic[1] | `ScvAddress` | Address that accepted the admin role |
+| (void) | data | `ScvVoid` | No data payload |
+
+---
+
+#### `paused` / `unpaused`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"paused"` or `"unpaused"` | topic[0] | `ScvSymbol` | Event name |
+| admin | topic[1] | `ScvAddress` | Admin that toggled the pause |
+| (void) | data | `ScvVoid` | No data payload |
+
+---
+
+#### `upgraded`
+
+Emitted after a successful WASM upgrade.
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"upgraded"` | topic[0] | `ScvSymbol` | Event name |
+| admin | topic[1] | `ScvAddress` | Admin that executed the upgrade |
+| wasm_hash | data | `ScvBytes` (32 bytes) | Hash of the new WASM module |
+
+---
+
+### Escrow Contract — Event Details
+
+#### `initialized`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"initialized"` | topic[0] | `ScvSymbol` | Event name |
+| buyer | topic[1] | `ScvAddress` | Buyer address |
+| seller | topic[2] | `ScvAddress` | Seller address |
+| arbiter | topic[3] | `ScvAddress` | Arbiter address |
+| amount | data | `ScvI128` | Escrowed amount in base units |
+
+---
+
+#### `escrow_created`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"escrow_created"` | topic[0] | `ScvSymbol` | Event name |
+| buyer | topic[1] | `ScvAddress` | Buyer address |
+| seller | topic[2] | `ScvAddress` | Seller address |
+| amount | data | `ScvI128` | Agreed amount in base units |
+
+---
+
+#### `escrow_funded`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"escrow_funded"` | topic[0] | `ScvSymbol` | Event name |
+| buyer | topic[1] | `ScvAddress` | Buyer who funded |
+| amount | data | `ScvI128` | Amount transferred into escrow |
+
+---
+
+#### `delivery_marked`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"delivery_marked"` | topic[0] | `ScvSymbol` | Event name |
+| seller | topic[1] | `ScvAddress` | Seller who marked delivery |
+| (void) | data | `ScvVoid` | No data payload |
+
+---
+
+#### `funds_released`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"funds_released"` | topic[0] | `ScvSymbol` | Event name |
+| seller | topic[1] | `ScvAddress` | Seller who received the funds |
+| amount | data | `ScvI128` | Amount released in base units |
+
+---
+
+#### `partial_release`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"partial_release"` | topic[0] | `ScvSymbol` | Event name |
+| seller | topic[1] | `ScvAddress` | Seller who received the partial payment |
+| amount | data | `ScvI128` | Partial amount released in base units |
+
+---
+
+#### `funds_refunded`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"funds_refunded"` | topic[0] | `ScvSymbol` | Event name |
+| buyer | topic[1] | `ScvAddress` | Buyer who received the refund |
+| amount | data | `ScvI128` | Refunded amount in base units |
+
+---
+
+#### `dispute_raised`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"dispute_raised"` | topic[0] | `ScvSymbol` | Event name |
+| caller | topic[1] | `ScvAddress` | Party (buyer or seller) who raised the dispute |
+| (void) | data | `ScvVoid` | No data payload |
+
+---
+
+#### `amount_updated`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"amount_updated"` | topic[0] | `ScvSymbol` | Event name |
+| buyer | topic[1] | `ScvAddress` | Buyer who changed the amount |
+| new_amount | data | `ScvI128` | Updated escrow amount in base units |
+
+---
+
+#### `deadline_extended`
+
+| Field | Position | XDR Type | Meaning |
+|---|---|---|---|
+| `"deadline_extended"` | topic[0] | `ScvSymbol` | Event name |
+| buyer | topic[1] | `ScvAddress` | Buyer who requested the extension |
+| new_deadline | data | `ScvU32` | New deadline ledger sequence number |
+
+---
+
+### Decoding with the Stellar CLI
+
+```bash
+# Decode a single ScVal from base64 XDR
+stellar xdr decode --type ScVal --xdr "<BASE64>"
+
+# Fetch the last 10 events for a contract as JSON
+stellar contract events \
+  --id <CONTRACT_ID> \
+  --network testnet \
+  --output json \
+  | jq '.[] | {name: .topic[0], data: .value}'
+```
+
+---
+
+## 8a. Event Topic Convention
 
 All events in both Token and Escrow contracts follow a standardized topic structure for consistent indexing:
 

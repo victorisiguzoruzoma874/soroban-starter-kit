@@ -43,6 +43,7 @@ just --list
 | **Vesting** | Token vesting with cliff + linear release schedule | Team allocations, investor lockups, employee grants | ✅ Complete |
 | **Staking** | Token staking with proportional reward distribution | DeFi yield, protocol incentives, liquidity mining | ✅ Complete |
 | **Multisig** | N-of-M wallet for threshold-approved contract calls | DAO treasuries, team wallets, shared administration | ✅ Complete |
+| **Subscription** | Recurring token-pull payment contract | SaaS billing, streaming payments, membership fees | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -77,6 +78,15 @@ just --list
 - **Token Agnostic**: Works with any Soroban-compatible token
 - **Event Emission**: `staked`, `unstaked`, `rewards_claimed`, and `rewards_added` events
 - **TTL Management**: Instance storage TTL is extended on every interaction
+### Subscription Contract Features
+- **Provider-Initiated Charges**: Service provider pulls payments on a configurable ledger interval
+- **Subscriber-Controlled Plans**: Subscribers set their own amount and interval; cancel at any time
+- **Allowance-Based Pulls**: Uses token `approve` + `transfer_from` — no funds are locked up-front
+- **Re-subscribe Support**: Cancelled subscribers can create a new plan without re-deploying
+- **State Tracking**: Subscription state (active, last charged ledger) stored per subscriber
+- **Event Emission**: `subscribed`, `charged`, and `cancelled` events for off-chain tracking
+- **TTL Management**: Both instance and persistent storage entries are extended on each interaction
+
 ### Multisig Contract Features
 - **N-of-M Authorization**: Configure any valid threshold across unique signers
 - **Signer Management**: Add or remove signers with threshold-approved changes
