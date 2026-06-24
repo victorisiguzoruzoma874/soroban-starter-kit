@@ -1,0 +1,30 @@
+use soroban_sdk::{Address, Env, Symbol};
+
+pub fn initialized(
+    env: &Env,
+    admin: &Address,
+    beneficiary: &Address,
+    release_ledger: u32,
+    amount: i128,
+) {
+    env.events().publish(
+        (
+            Symbol::new(env, "initialized"),
+            admin.clone(),
+            beneficiary.clone(),
+        ),
+        (release_ledger, amount),
+    );
+}
+
+pub fn released(env: &Env, beneficiary: &Address, amount: i128) {
+    env.events().publish(
+        (Symbol::new(env, "released"), beneficiary.clone()),
+        amount,
+    );
+}
+
+pub fn cancelled(env: &Env, admin: &Address) {
+    env.events()
+        .publish((Symbol::new(env, "cancelled"), admin.clone()), ());
+}

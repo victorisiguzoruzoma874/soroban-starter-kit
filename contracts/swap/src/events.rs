@@ -1,0 +1,28 @@
+use soroban_sdk::{Address, Env, Symbol};
+
+pub fn swap_proposed(
+    env: &Env,
+    party_a: &Address,
+    swap_id: u32,
+    token_a: &Address,
+    amount_a: i128,
+    token_b: &Address,
+    amount_b: i128,
+) {
+    env.events().publish(
+        (Symbol::new(env, "swap_proposed"), party_a.clone()),
+        (swap_id, token_a.clone(), amount_a, token_b.clone(), amount_b),
+    );
+}
+
+pub fn swap_accepted(env: &Env, party_b: &Address, swap_id: u32) {
+    env.events().publish(
+        (Symbol::new(env, "swap_accepted"), party_b.clone()),
+        swap_id,
+    );
+}
+
+pub fn swap_cancelled(env: &Env, swap_id: u32) {
+    env.events()
+        .publish((Symbol::new(env, "swap_cancelled"),), swap_id);
+}

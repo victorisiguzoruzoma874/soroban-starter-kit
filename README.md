@@ -43,6 +43,10 @@ just --list
 | **Vesting** | Token vesting with cliff + linear release schedule | Team allocations, investor lockups, employee grants | ✅ Complete |
 | **Staking** | Token staking with proportional reward distribution | DeFi yield, protocol incentives, liquidity mining | ✅ Complete |
 | **Multisig** | N-of-M wallet for threshold-approved contract calls | DAO treasuries, team wallets, shared administration | ✅ Complete |
+| **Timelock** | Time-locked token release to a beneficiary | Team token locks, delayed payments, governance timelocks | ✅ Complete |
+| **NFT** | Non-fungible token with admin minting and optional supply cap | Digital collectibles, on-chain ownership, access tokens | ✅ Complete |
+| **DAO** | On-chain governance with token-weighted voting | Protocol upgrades, treasury management, community decisions | ✅ Complete |
+| **Swap** | Atomic two-party token swap with deadline | P2P token exchange, OTC trades, trustless DeFi swaps | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -84,6 +88,40 @@ just --list
 - **Signature Tracking**: Prevent duplicate signatures and non-signer approvals
 - **Threshold Execution**: Execute proposed calls only after enough signatures
 - **Event Emission**: Initialization, signer changes, signatures, and execution emit events
+
+### Timelock Contract Features
+- **Time-Locked Release**: Tokens held until a specified ledger sequence number, then released to the beneficiary
+- **Admin Cancellation**: Admin can cancel and reclaim tokens at any time before release
+- **Open Release**: Once the release ledger is reached, `release` is callable by anyone
+- **Token Agnostic**: Works with any Soroban-compatible token
+- **Event Emission**: `initialized`, `released`, and `cancelled` events for off-chain tracking
+- **TTL Management**: Instance storage TTL is extended on every interaction
+
+### NFT Contract Features
+- **Unique Token Ownership**: Each token ID maps to exactly one owner tracked in persistent storage
+- **Admin-Controlled Minting**: Only the admin may mint new tokens; optional supply cap enforced at mint time
+- **Standard Operations**: `mint`, `transfer`, `burn`, `approve`, `transfer_from` matching ERC-721 semantics
+- **Per-Token Metadata**: Each token has an associated URI stored on-chain; collection has name and symbol
+- **Approval System**: Single-token approvals cleared automatically on transfer or burn
+- **Property Tests**: Proptest suite verifies supply invariants and ownership correctness
+- **Event Emission**: `minted`, `transferred`, `burned`, and `approved` events
+
+### DAO Contract Features
+- **Token-Weighted Voting**: Voting power equals the voter's token balance at vote time
+- **Configurable Parameters**: Voting period (in ledgers) and quorum threshold set at initialization
+- **Proposal Lifecycle**: `Active → Executed` (passes) or `Active → Cancelled` (admin)
+- **Quorum + Majority**: Proposals execute only when total votes ≥ quorum AND yes > no
+- **Double-Vote Prevention**: Each address may vote exactly once per proposal
+- **Event Emission**: `proposal_created`, `voted`, `prop_executed`, and `prop_cancelled` events
+- **TTL Management**: Persistent proposal and vote records are bumped on every write
+
+### Swap Contract Features
+- **Atomic Exchange**: Both token transfers occur in a single transaction — no partial fills
+- **Deadline-Based Expiry**: Swaps expire after a configurable ledger; anyone may cancel to recover party A's tokens
+- **Party A Control**: Party A can cancel any open swap before it is accepted
+- **Multi-Swap Support**: Multiple concurrent swaps tracked by auto-incrementing IDs
+- **Token Agnostic**: Works with any pair of Soroban-compatible tokens
+- **Event Emission**: `swap_proposed`, `swap_accepted`, and `swap_cancelled` events
 
 Each template includes:
 - ✅ Complete contract implementation

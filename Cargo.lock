@@ -1293,6 +1293,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-dao-template"
+version = "0.1.0"
+dependencies = [
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-env-common"
 version = "21.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1411,6 +1419,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-nft-template"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-sdk"
 version = "21.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1485,6 +1502,22 @@ name = "soroban-staking-template"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "soroban-swap-template"
+version = "0.1.0"
+dependencies = [
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "soroban-timelock-template"
+version = "0.1.0"
+dependencies = [
  "soroban-common",
  "soroban-sdk",
 ]
