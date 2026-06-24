@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, Env};
 
 /// Top-level storage keys used by [`EscrowContract`](crate::EscrowContract).
 ///
@@ -76,6 +76,21 @@ impl core::fmt::Display for EscrowState {
             EscrowState::Cancelled => "cancelled",
         })
     }
+}
+
+/// Reads the current [`EscrowState`] from instance storage and returns
+/// `Err(EscrowError::InvalidState)` when it does not match `expected`.
+/// Returns `Err(EscrowError::NotInitialized)` when no state has been stored yet.
+pub fn require_state(env: &Env, expected: EscrowState) -> Result<(), crate::errors::EscrowError> {
+    let state: EscrowState = env
+        .storage()
+        .instance()
+        .get(&DataKey::State)
+        .ok_or(crate::errors::EscrowError::NotInitialized)?;
+    if state != expected {
+        return Err(crate::errors::EscrowError::InvalidState);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
