@@ -577,3 +577,44 @@ The script also prints a warning when the deadline has passed and funds are stil
 - [Stellar Friendbot (testnet funding)](https://friendbot.stellar.org)
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [cargo-audit](https://crates.io/crates/cargo-audit)
+
+---
+
+## 14. Monitoring Token Contract Status
+
+Use `scripts/monitor-token.sh` to quickly inspect a deployed token contract:
+
+```bash
+TOKEN_CONTRACT_ID=<CONTRACT_ID> ./scripts/monitor-token.sh testnet
+```
+
+**Output:**
+
+```
+==============================
+ Token Contract Monitor
+ Network : testnet
+ Contract: C...
+==============================
+Admin:         G...
+Total Supply:  1000000
+Max Supply:    uncapped
+Paused:        false
+Version:       abc1234
+==============================
+```
+
+| Field | Source |
+|-------|--------|
+| Admin | `admin()` |
+| Total Supply | `total_supply()` |
+| Max Supply | `max_supply()` — `uncapped` if `capped-supply` feature is not enabled |
+| Paused | Detected via simulate-only call; `n/a` if `pausable` feature is not enabled |
+| Version | `version()` — git commit hash baked in at compile time |
+
+Set `TOKEN_CONTRACT_ID` as an environment variable or export it in your shell profile for repeated use:
+
+```bash
+export TOKEN_CONTRACT_ID=<CONTRACT_ID>
+./scripts/monitor-token.sh mainnet
+```

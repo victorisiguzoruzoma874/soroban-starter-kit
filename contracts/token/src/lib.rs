@@ -1,13 +1,15 @@
 #![no_std]
+#![no_std]
 
 use soroban_sdk::{
-    contract, contractimpl, panic_with_error, token::{self, TokenInterface}, Address, Env, String,
+    contract, contractimpl, token, token::TokenInterface, Address, Env, String,
 };
 
 mod admin;
 mod errors;
 mod events;
 mod storage;
+mod token_interface;
 
 #[cfg(test)]
 mod test;
@@ -17,20 +19,20 @@ use errors::TokenError;
 use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 use storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
 
-fn bump_instance(env: &Env) {
+pub(crate) fn bump_instance(env: &Env) {
     env.storage()
         .instance()
         .extend_ttl(LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 }
 
-fn bump_persistent(env: &Env, key: &DataKey) {
+pub(crate) fn bump_persistent(env: &Env, key: &DataKey) {
     env.storage()
         .persistent()
         .extend_ttl(key, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 }
 
 #[cfg(feature = "pausable")]
-fn require_not_paused(env: &Env) -> Result<(), TokenError> {
+pub(crate) fn require_not_paused(env: &Env) -> Result<(), TokenError> {
     if env
         .storage()
         .instance()
@@ -43,7 +45,7 @@ fn require_not_paused(env: &Env) -> Result<(), TokenError> {
 }
 
 #[cfg(feature = "freeze")]
-fn require_not_frozen(env: &Env, account: &Address) -> Result<(), TokenError> {
+pub(crate) fn require_not_frozen(env: &Env, account: &Address) -> Result<(), TokenError> {
     if env
         .storage()
         .instance()
@@ -61,13 +63,6 @@ pub struct TokenContract;
 #[contractimpl]
 impl TokenContract {
     /// Initialize the token with metadata and an admin. Must be called once.
-    ///
-    /// `max_supply` is only enforced when the `capped-supply` feature is enabled.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::AlreadyInitialized`] if the contract has already been initialized.
-    /// Returns [`TokenError::InvalidAmount`] if `max_supply` is provided and is <= 0.
     pub fn initialize(
         env: Env,
         admin: Address,
@@ -107,12 +102,6 @@ impl TokenContract {
     }
 
     /// Mint `amount` tokens to `to`. Admin only.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::InvalidAmount`] if `amount` <= 0.
-    /// Returns [`TokenError::Overflow`] if the mint would overflow the total supply.
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn mint(env: Env, to: Address, amount: i128) -> Result<(), TokenError> {
         #[cfg(feature = "pausable")]
         require_not_paused(&env)?;
@@ -153,9 +142,6 @@ impl TokenContract {
     }
 
     /// Mint tokens to multiple recipients in a single transaction. Admin only.
-    ///
-    /// Validates all amounts > 0 before any state changes. Respects `capped-supply` cap
-    /// across the entire batch. Emits individual `mint` events per recipient.
     pub fn batch_mint(
         env: Env,
         recipients: soroban_sdk::Vec<(Address, i128)>,
@@ -165,7 +151,6 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
 
-        // Validate all amounts > 0 before any state changes
         let mut total_amount: i128 = 0;
         for (_, amount) in recipients.iter() {
             if amount <= 0 {
@@ -174,7 +159,6 @@ impl TokenContract {
             total_amount = total_amount.checked_add(amount).ok_or(TokenError::Overflow)?;
         }
 
-        // Check capped-supply cap
         #[cfg(feature = "capped-supply")]
         {
             let supply: i128 = env
@@ -193,7 +177,6 @@ impl TokenContract {
             }
         }
 
-        // Mint to each recipient
         for (to, amount) in recipients.iter() {
             let balance: i128 = env
                 .storage()
@@ -208,7 +191,6 @@ impl TokenContract {
             events::minted(&env, &to, amount);
         }
 
-        // Update total supply once
         let supply: i128 = env
             .storage()
             .instance()
@@ -223,13 +205,6 @@ impl TokenContract {
     }
 
     /// Burn `amount` tokens from `from`. Admin only.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::InvalidAmount`] if `amount` <= 0.
-    /// Returns [`TokenError::InsufficientBalance`] if `from` has fewer than `amount` tokens.
-    /// Returns [`TokenError::Overflow`] if the burn would underflow the total supply.
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn admin_burn(env: Env, from: Address, amount: i128) -> Result<(), TokenError> {
         #[cfg(feature = "pausable")]
         require_not_paused(&env)?;
@@ -253,14 +228,6 @@ impl TokenContract {
     }
 
     /// Propose a new admin. Current admin only.
-    ///
-    /// The transfer is not final until `new_admin` calls [`accept_admin`].
-    /// Replaces the one-step `set_admin` to prevent accidental loss of admin
-    /// access from a typo in the new address.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the current admin.
     pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -271,10 +238,6 @@ impl TokenContract {
     }
 
     /// Accept a pending admin transfer. Must be called by the pending admin.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if there is no pending admin or the caller is not the pending admin.
     pub fn accept_admin(env: Env) -> Result<(), TokenError> {
         let pending: Address = env
             .storage()
@@ -282,7 +245,6 @@ impl TokenContract {
             .get(&DataKey::PendingAdmin)
             .ok_or(TokenError::Unauthorized)?;
         pending.require_auth();
-        let old_admin = require_admin(&env)?;
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
         bump_instance(&env);
@@ -291,10 +253,6 @@ impl TokenContract {
     }
 
     /// Cancel a pending admin transfer. Current admin only.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the current admin.
     pub fn cancel_admin_proposal(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -305,8 +263,6 @@ impl TokenContract {
     }
 
     /// Deprecated: use `propose_admin` + `accept_admin` instead.
-    ///
-    /// Kept for backwards compatibility. Will be removed in a future version.
     pub fn set_admin(env: Env, new_admin: Address) -> Result<(), TokenError> {
         let old_admin = require_admin(&env)?;
         old_admin.require_auth();
@@ -317,10 +273,6 @@ impl TokenContract {
     }
 
     /// Return the current admin address.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::NotInitialized`] if the contract has not been initialized.
     #[must_use]
     pub fn admin(env: Env) -> Result<Address, TokenError> {
         env.storage()
@@ -338,13 +290,7 @@ impl TokenContract {
             .unwrap_or(0)
     }
 
-    /// Return `Some(balance)` if `id` has an entry in storage, or `None` if the
-    /// address has never held tokens.
-    ///
-    /// Unlike [`balance`] (which returns `0` for both unknown addresses and
-    /// addresses with a zero balance), `balance_of` lets callers distinguish
-    /// between "never seen this address" (`None`) and "address exists with a
-    /// zero balance" (`Some(0)`).
+    /// Return `Some(balance)` if `id` has an entry in storage, or `None` if not.
     #[must_use]
     pub fn balance_of(env: Env, id: Address) -> Option<i128> {
         env.storage()
@@ -365,17 +311,22 @@ impl TokenContract {
             .get(&DataKey::Version)
             .unwrap_or(0)
     }
+
+    /// Return the expiration ledger for an allowance, or `None` if no allowance exists.
+    pub fn allowance_expiry(env: Env, from: Address, spender: Address) -> Option<u32> {
+        let key = DataKey::Allowance(AllowanceDataKey { from, spender });
+        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
+        match val {
+            Some(v) if env.ledger().sequence() <= v.expiration_ledger => Some(v.expiration_ledger),
+            _ => None,
+        }
+    }
 }
 
 /// Pause / unpause — only compiled when the `pausable` feature is enabled.
 #[cfg(feature = "pausable")]
 #[contractimpl]
 impl TokenContract {
-    /// Pause all token operations. Admin only.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn pause(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -385,11 +336,6 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Resume all token operations. Admin only.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn unpause(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -404,7 +350,6 @@ impl TokenContract {
 #[cfg(feature = "freeze")]
 #[contractimpl]
 impl TokenContract {
-    /// Freeze an account, preventing transfers and burns. Admin only.
     pub fn freeze_account(env: Env, account: Address) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -417,7 +362,6 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Unfreeze an account, allowing transfers and burns. Admin only.
     pub fn unfreeze_account(env: Env, account: Address) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -435,17 +379,8 @@ impl TokenContract {
 #[cfg(feature = "upgradeable")]
 #[contractimpl]
 impl TokenContract {
-    /// Minimum ledgers between proposing and executing a WASM upgrade (~24 h at 5 s/ledger).
     const UPGRADE_DELAY_LEDGERS: u32 = 17_280;
 
-    /// Propose a WASM upgrade. Admin only.
-    ///
-    /// Stores `wasm_hash` and a `ready_after` ledger number. The upgrade cannot
-    /// be executed until at least `UPGRADE_DELAY_LEDGERS` ledgers have passed.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin.
     pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -461,13 +396,6 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Execute a previously proposed WASM upgrade. Admin only.
-    ///
-    /// Fails if no upgrade has been proposed or if the timelock has not yet elapsed.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TokenError::Unauthorized`] if the caller is not the admin, no upgrade is pending, or the timelock has not elapsed.
     pub fn execute_upgrade(env: Env) -> Result<(), TokenError> {
         let admin = require_admin(&env)?;
         admin.require_auth();
@@ -503,239 +431,14 @@ impl TokenContract {
 #[cfg(feature = "capped-supply")]
 #[contractimpl]
 impl TokenContract {
-    /// Return the configured maximum supply cap, or `None` if uncapped.
     #[must_use]
     pub fn max_supply(env: Env) -> Option<i128> {
         env.storage().instance().get(&DataKey::MaxSupply)
     }
 }
 
-#[contractimpl]
 impl TokenContract {
-    /// Return the expiration ledger for an allowance, or `None` if no allowance exists.
-    pub fn allowance_expiry(env: Env, from: Address, spender: Address) -> Option<u32> {
-        let key = DataKey::Allowance(AllowanceDataKey {
-            from: from.clone(),
-            spender: spender.clone(),
-        });
-        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-        match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => Some(v.expiration_ledger),
-            _ => None,
-        }
-    }
-}
-
-#[contractimpl]
-impl token::TokenInterface for TokenContract {
-    #[must_use]
-    fn allowance(env: Env, from: Address, spender: Address) -> i128 {
-        let key = DataKey::Allowance(AllowanceDataKey {
-            from: from.clone(),
-            spender: spender.clone(),
-        });
-        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-        match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => v.amount,
-            _ => 0,
-        }
-    }
-
-    fn approve(
-        env: Env,
-        from: Address,
-        spender: Address,
-        amount: i128,
-        expiration_ledger: u32,
-    ) {
-        from.require_auth();
-        let key = DataKey::Allowance(AllowanceDataKey {
-            from: from.clone(),
-            spender: spender.clone(),
-        });
-        env.storage()
-            .temporary()
-            .set(&key, &AllowanceValue { amount, expiration_ledger });
-        if expiration_ledger > env.ledger().sequence() {
-            env.storage()
-                .temporary()
-                .extend_ttl(&key, expiration_ledger, expiration_ledger);
-        }
-        if amount == 0 {
-            events::revoked(&env, &from, &spender);
-        } else {
-            events::approved(&env, &from, &spender, amount);
-        }
-    }
-
-    #[must_use]
-    fn balance(env: Env, id: Address) -> i128 {
-        // Returns 0 for both unknown addresses and addresses with a zero balance.
-        // Use `balance_of` to distinguish between the two cases.
-        env.storage()
-            .persistent()
-            .get(&DataKey::Balance(id))
-            .unwrap_or(0)
-    }
-
-    fn transfer(env: Env, from: Address, to: Address, amount: i128) {
-        from.require_auth();
-        #[cfg(feature = "pausable")]
-        if let Err(e) = require_not_paused(&env) {
-            panic_with_error!(&env, e);
-        }
-        #[cfg(feature = "freeze")]
-        if let Err(e) = require_not_frozen(&env, &from) {
-            panic_with_error!(&env, e);
-        }
-        if let Err(e) = Self::transfer_impl(&env, from, to, amount) {
-            panic_with_error!(&env, e);
-        }
-    }
-
-    fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
-        spender.require_auth();
-        #[cfg(feature = "pausable")]
-        if let Err(e) = require_not_paused(&env) {
-            panic_with_error!(&env, e);
-        }
-        #[cfg(feature = "freeze")]
-        if let Err(e) = require_not_frozen(&env, &from) {
-            panic_with_error!(&env, e);
-        }
-        let key = DataKey::Allowance(AllowanceDataKey {
-            from: from.clone(),
-            spender: spender.clone(),
-        });
-        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-        let (allowance, expiration_ledger) = match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => (v.amount, v.expiration_ledger),
-            _ => (0, 0),
-        };
-        if allowance < amount {
-            panic_with_error!(&env, TokenError::InsufficientAllowance);
-        }
-        env.storage().temporary().set(
-            &key,
-            &AllowanceValue {
-                amount: allowance - amount,
-                expiration_ledger,
-            },
-        );
-        if let Err(e) = Self::transfer_impl(&env, from, to, amount) {
-            panic_with_error!(&env, e);
-        }
-    }
-
-    fn burn(env: Env, from: Address, amount: i128) {
-        from.require_auth();
-        #[cfg(feature = "pausable")]
-        if let Err(e) = require_not_paused(&env) {
-            panic_with_error!(&env, e);
-        }
-        #[cfg(feature = "freeze")]
-        if let Err(e) = require_not_frozen(&env, &from) {
-            panic_with_error!(&env, e);
-        }
-        if amount <= 0 {
-            panic_with_error!(&env, TokenError::InvalidAmount);
-        }
-        if let Err(e) = Self::update_balance(&env, &from, -amount) {
-            panic_with_error!(&env, e);
-        }
-        let supply: i128 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0);
-        let new_supply = match supply.checked_sub(amount) {
-            Some(v) => v,
-            None => panic_with_error!(&env, TokenError::Overflow),
-        };
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &new_supply);
-        bump_instance(&env);
-        events::burned(&env, &from, amount);
-    }
-
-    fn burn_from(env: Env, spender: Address, from: Address, amount: i128) {
-        spender.require_auth();
-        #[cfg(feature = "pausable")]
-        if let Err(e) = require_not_paused(&env) {
-            panic_with_error!(&env, e);
-        }
-        #[cfg(feature = "freeze")]
-        if let Err(e) = require_not_frozen(&env, &from) {
-            panic_with_error!(&env, e);
-        }
-        let key = DataKey::Allowance(AllowanceDataKey {
-            from: from.clone(),
-            spender: spender.clone(),
-        });
-        let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-        let (allowance, expiration_ledger) = match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => (v.amount, v.expiration_ledger),
-            _ => (0, 0),
-        };
-        if allowance < amount {
-            panic_with_error!(&env, TokenError::InsufficientAllowance);
-        }
-        env.storage().temporary().set(
-            &key,
-            &AllowanceValue {
-                amount: allowance - amount,
-                expiration_ledger,
-            },
-        );
-        if let Err(e) = Self::update_balance(&env, &from, -amount) {
-            panic_with_error!(&env, e);
-        }
-        let supply: i128 = env
-            .storage()
-            .instance()
-            .get(&DataKey::TotalSupply)
-            .unwrap_or(0);
-        let new_supply = match supply.checked_sub(amount) {
-            Some(v) => v,
-            None => panic_with_error!(&env, TokenError::Overflow),
-        };
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalSupply, &new_supply);
-        bump_instance(&env);
-        events::burned(&env, &from, amount);
-    }
-
-    #[must_use]
-    fn decimals(env: Env) -> u32 {
-        env.storage()
-            .instance()
-            .get(&DataKey::Metadata(MetadataKey::Decimals))
-            .unwrap_or_default()
-    }
-
-    #[must_use]
-    fn name(env: Env) -> String {
-        env.storage()
-            .instance()
-            .get(&DataKey::Metadata(MetadataKey::Name))
-            .unwrap_or_else(|| String::from_str(&env, ""))
-    }
-
-    #[must_use]
-    fn symbol(env: Env) -> String {
-        env.storage()
-            .instance()
-            .get(&DataKey::Metadata(MetadataKey::Symbol))
-            .unwrap_or_else(|| String::from_str(&env, ""))
-    }
-}
-
-impl TokenContract {
-    /// Update a balance by a delta amount, handling storage read/write and TTL bump.
-    /// Returns error if the resulting balance would be negative or overflow.
-    fn update_balance(env: &Env, account: &Address, delta: i128) -> Result<(), TokenError> {
+    pub(crate) fn update_balance(env: &Env, account: &Address, delta: i128) -> Result<(), TokenError> {
         let balance: i128 = env
             .storage()
             .persistent()
@@ -752,23 +455,7 @@ impl TokenContract {
         Ok(())
     }
 
-    /// Move `amount` tokens from `from` to `to`, updating persistent storage and emitting an event.
-    ///
-    /// # Preconditions (caller must ensure before calling)
-    /// - Caller authorization for `from` has already been checked (`from.require_auth()` or
-    ///   allowance deducted).
-    /// - `amount` is positive (this function also enforces it, but callers should pre-validate).
-    ///
-    /// # What this function validates
-    /// - Returns `Ok(())` immediately when `from == to` (no-op, no event emitted).
-    /// - Returns [`TokenError::InvalidAmount`] if `amount <= 0`.
-    /// - Returns [`TokenError::InsufficientBalance`] if `from`'s balance is less than `amount`.
-    ///
-    /// # What this function does NOT validate
-    /// - Does not check authorization — that is the caller's responsibility.
-    /// - Does not enforce allowances — `transfer_from` deducts the allowance before calling here.
-    /// - Does not check or update `TotalSupply` — supply only changes on mint/burn.
-    fn transfer_impl(env: &Env, from: Address, to: Address, amount: i128) -> Result<(), TokenError> {
+    pub(crate) fn transfer_impl(env: &Env, from: Address, to: Address, amount: i128) -> Result<(), TokenError> {
         if from == to {
             return Ok(());
         }
@@ -779,5 +466,39 @@ impl TokenContract {
         Self::update_balance(env, &to, amount)?;
         events::transferred(env, &from, &to, amount);
         Ok(())
+    }
+}
+
+#[contractimpl]
+impl token::TokenInterface for TokenContract {
+    fn allowance(env: Env, from: Address, spender: Address) -> i128 {
+        token_interface::allowance(env, from, spender)
+    }
+    fn approve(env: Env, from: Address, spender: Address, amount: i128, expiration_ledger: u32) {
+        token_interface::approve(env, from, spender, amount, expiration_ledger)
+    }
+    fn balance(env: Env, id: Address) -> i128 {
+        token_interface::balance(env, id)
+    }
+    fn transfer(env: Env, from: Address, to: Address, amount: i128) {
+        token_interface::transfer(env, from, to, amount)
+    }
+    fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amount: i128) {
+        token_interface::transfer_from(env, spender, from, to, amount)
+    }
+    fn burn(env: Env, from: Address, amount: i128) {
+        token_interface::burn(env, from, amount)
+    }
+    fn burn_from(env: Env, spender: Address, from: Address, amount: i128) {
+        token_interface::burn_from(env, spender, from, amount)
+    }
+    fn decimals(env: Env) -> u32 {
+        token_interface::decimals(env)
+    }
+    fn name(env: Env) -> String {
+        token_interface::name(env)
+    }
+    fn symbol(env: Env) -> String {
+        token_interface::symbol(env)
     }
 }
