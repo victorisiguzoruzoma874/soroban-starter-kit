@@ -58,6 +58,12 @@ pub enum EscrowState {
     Cancelled = 6,
 }
 
+impl Default for EscrowState {
+    fn default() -> Self {
+        EscrowState::Created
+    }
+}
+
 impl core::fmt::Display for EscrowState {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
@@ -75,6 +81,11 @@ impl core::fmt::Display for EscrowState {
 #[cfg(test)]
 mod tests {
     use super::EscrowState;
+
+    #[test]
+    fn test_escrow_state_default() {
+        assert_eq!(EscrowState::default(), EscrowState::Created);
+    }
 
     #[test]
     fn test_escrow_state_display() {
