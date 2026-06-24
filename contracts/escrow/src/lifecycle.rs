@@ -4,15 +4,9 @@ use crate::admin;
 use crate::errors::EscrowError;
 use crate::events;
 use crate::storage::{DataKey, EscrowState};
-use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
+use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
 
 use DataKey::*;
-
-pub fn bump_instance(env: &Env) {
-    env.storage()
-        .instance()
-        .extend_ttl(LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-}
 
 pub fn get_required<T: soroban_sdk::TryFromVal<soroban_sdk::Env, soroban_sdk::Val>>(
     env: &Env,
@@ -66,7 +60,7 @@ pub fn initialize(
     env.storage().instance().set(&State, &EscrowState::Created);
     env.storage().instance().set(&RequiredSignatures, &1u32);
 
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     events::escrow_created(&env, &buyer, &seller, amount);
     events::initialized(&env, &buyer, &seller, &arbiter, amount);
@@ -115,7 +109,7 @@ pub fn initialize_with_arbiters(
     env.storage().instance().set(&Deadline, &deadline_ledger);
     env.storage().instance().set(&State, &EscrowState::Created);
 
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     events::escrow_created(&env, &buyer, &seller, amount);
     events::initialized(&env, &buyer, &seller, &arbiters.get(0).unwrap(), amount);
@@ -145,7 +139,7 @@ pub fn update_amount(env: Env, new_amount: i128) -> Result<(), EscrowError> {
     }
 
     env.storage().instance().set(&Amount, &new_amount);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
         .publish((Symbol::new(&env, "amount_updated"), buyer), new_amount);
@@ -175,7 +169,7 @@ pub fn fund(env: Env) -> Result<(), EscrowError> {
     token_client.transfer(&buyer, &env.current_contract_address(), &amount);
 
     env.storage().instance().set(&State, &EscrowState::Funded);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
         .publish((Symbol::new(&env, "escrow_funded"), buyer), amount);
@@ -196,7 +190,7 @@ pub fn mark_delivered(env: Env) -> Result<(), EscrowError> {
     }
 
     env.storage().instance().set(&State, &EscrowState::Delivered);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
         .publish((Symbol::new(&env, "delivery_marked"), seller), ());
@@ -246,7 +240,7 @@ pub fn release_partial(env: Env, amount: i128) -> Result<(), EscrowError> {
     let seller: Address = env.storage().instance().get(&Seller).unwrap();
     let new_amount = stored_amount - amount;
     env.storage().instance().set(&Amount, &new_amount);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     admin::transfer_token(&env, &env.current_contract_address(), &seller, amount);
     events::partial_release(&env, &seller, amount);
@@ -283,7 +277,7 @@ pub fn cancel(env: Env) -> Result<(), EscrowError> {
     }
 
     env.storage().instance().set(&State, &EscrowState::Cancelled);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
         .publish((Symbol::new(&env, "escrow_cancelled"), buyer), ());
@@ -326,7 +320,7 @@ pub fn extend_deadline(env: Env, new_deadline: u32) -> Result<(), EscrowError> {
     }
 
     env.storage().instance().set(&Deadline, &new_deadline);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
         .publish((Symbol::new(&env, "deadline_extended"), buyer), new_deadline);
@@ -341,7 +335,7 @@ pub fn release_to_seller(env: Env) -> Result<(), EscrowError> {
     let amount: i128 = get_required(&env, &Amount)?;
 
     env.storage().instance().set(&State, &EscrowState::Completed);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     admin::transfer_token(&env, &env.current_contract_address(), &seller, amount);
 
@@ -358,7 +352,7 @@ pub fn refund_to_buyer(env: Env) -> Result<(), EscrowError> {
     let amount: i128 = get_required(&env, &Amount)?;
 
     env.storage().instance().set(&State, &EscrowState::Refunded);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     admin::transfer_token(&env, &env.current_contract_address(), &buyer, amount);
 

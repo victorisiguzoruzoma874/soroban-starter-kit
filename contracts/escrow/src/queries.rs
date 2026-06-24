@@ -3,6 +3,7 @@ use soroban_sdk::Env;
 use crate::errors::EscrowError;
 use crate::lifecycle::get_required;
 use crate::storage::{DataKey, EscrowInfo, EscrowState};
+use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 
 use DataKey::*;
 
@@ -37,6 +38,6 @@ pub fn bump(env: Env) -> Result<(), EscrowError> {
     if !env.storage().instance().has(&State) {
         return Err(EscrowError::NotInitialized);
     }
-    crate::lifecycle::bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
     Ok(())
 }

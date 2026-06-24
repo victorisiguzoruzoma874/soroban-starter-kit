@@ -1,8 +1,9 @@
 use soroban_sdk::{Address, Env, Symbol};
 
 use crate::errors::EscrowError;
-use crate::lifecycle::{bump_instance, get_required, refund_to_buyer, release_to_seller};
+use crate::lifecycle::{get_required, refund_to_buyer, release_to_seller};
 use crate::storage::{DataKey, EscrowState};
+use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 
 use DataKey::*;
 
@@ -24,7 +25,7 @@ pub fn raise_dispute(env: Env, caller: Address) -> Result<(), EscrowError> {
     }
 
     env.storage().instance().set(&State, &EscrowState::Disputed);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
         .publish((Symbol::new(&env, "dispute_raised"), caller), ());

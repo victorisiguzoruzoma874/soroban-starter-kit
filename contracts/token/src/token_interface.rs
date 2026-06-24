@@ -8,7 +8,8 @@ use soroban_sdk::{panic_with_error, Address, Env, String};
 use crate::errors::TokenError;
 use crate::events;
 use crate::storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
-use crate::{bump_instance, TokenContract};
+use crate::TokenContract;
+use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 
 #[cfg(feature = "pausable")]
 use crate::require_not_paused;
@@ -130,7 +131,7 @@ pub fn burn(env: Env, from: Address, amount: i128) {
     env.storage()
         .instance()
         .set(&DataKey::TotalSupply, &new_supply);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
     events::burned(&env, &from, amount);
 }
 
@@ -178,7 +179,7 @@ pub fn burn_from(env: Env, spender: Address, from: Address, amount: i128) {
     env.storage()
         .instance()
         .set(&DataKey::TotalSupply, &new_supply);
-    bump_instance(&env);
+    extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
     events::burned(&env, &from, amount);
 }
 
