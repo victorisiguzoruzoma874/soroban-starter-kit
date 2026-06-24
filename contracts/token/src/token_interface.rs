@@ -5,9 +5,10 @@
 
 use soroban_sdk::{panic_with_error, Address, Env, String};
 
+use crate::allowance::{deduct_allowance, get_allowance, set_allowance};
 use crate::errors::TokenError;
 use crate::events;
-use crate::storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
+use crate::storage::{DataKey, MetadataKey};
 use crate::{bump_instance, TokenContract};
 
 #[cfg(feature = "pausable")]
@@ -17,28 +18,12 @@ use crate::require_not_paused;
 use crate::require_not_frozen;
 
 pub fn allowance(env: Env, from: Address, spender: Address) -> i128 {
-    let key = DataKey::Allowance(AllowanceDataKey { from, spender });
-    let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-    match val {
-        Some(v) if env.ledger().sequence() <= v.expiration_ledger => v.amount,
-        _ => 0,
-    }
+    get_allowance(&env, from, spender)
 }
 
 pub fn approve(env: Env, from: Address, spender: Address, amount: i128, expiration_ledger: u32) {
     from.require_auth();
-    let key = DataKey::Allowance(AllowanceDataKey {
-        from: from.clone(),
-        spender: spender.clone(),
-    });
-    env.storage()
-        .temporary()
-        .set(&key, &AllowanceValue { amount, expiration_ledger });
-    if expiration_ledger > env.ledger().sequence() {
-        env.storage()
-            .temporary()
-            .extend_ttl(&key, expiration_ledger, expiration_ledger);
-    }
+    set_allowance(&env, from.clone(), spender.clone(), amount, expiration_ledger);
     if amount == 0 {
         events::revoked(&env, &from, &spender);
     } else {
@@ -78,25 +63,7 @@ pub fn transfer_from(env: Env, spender: Address, from: Address, to: Address, amo
     if let Err(e) = require_not_frozen(&env, &from) {
         panic_with_error!(&env, e);
     }
-    let key = DataKey::Allowance(AllowanceDataKey {
-        from: from.clone(),
-        spender: spender.clone(),
-    });
-    let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-    let (allowance, expiration_ledger) = match val {
-        Some(v) if env.ledger().sequence() <= v.expiration_ledger => (v.amount, v.expiration_ledger),
-        _ => (0, 0),
-    };
-    if allowance < amount {
-        panic_with_error!(&env, TokenError::InsufficientAllowance);
-    }
-    env.storage().temporary().set(
-        &key,
-        &AllowanceValue {
-            amount: allowance - amount,
-            expiration_ledger,
-        },
-    );
+    deduct_allowance(&env, from.clone(), spender.clone(), amount);
     if let Err(e) = TokenContract::transfer_impl(&env, from, to, amount) {
         panic_with_error!(&env, e);
     }
@@ -144,25 +111,7 @@ pub fn burn_from(env: Env, spender: Address, from: Address, amount: i128) {
     if let Err(e) = require_not_frozen(&env, &from) {
         panic_with_error!(&env, e);
     }
-    let key = DataKey::Allowance(AllowanceDataKey {
-        from: from.clone(),
-        spender: spender.clone(),
-    });
-    let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
-    let (allowance, expiration_ledger) = match val {
-        Some(v) if env.ledger().sequence() <= v.expiration_ledger => (v.amount, v.expiration_ledger),
-        _ => (0, 0),
-    };
-    if allowance < amount {
-        panic_with_error!(&env, TokenError::InsufficientAllowance);
-    }
-    env.storage().temporary().set(
-        &key,
-        &AllowanceValue {
-            amount: allowance - amount,
-            expiration_ledger,
-        },
-    );
+    deduct_allowance(&env, from.clone(), spender.clone(), amount);
     if let Err(e) = TokenContract::update_balance(&env, &from, -amount) {
         panic_with_error!(&env, e);
     }
