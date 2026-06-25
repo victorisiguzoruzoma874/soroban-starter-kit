@@ -26,6 +26,46 @@ fn reward_per_token(env: &Env) -> i128 {
         .unwrap_or(0i128)
 }
 
+/// Helper to get admin address or return NotInitialized error.
+fn get_admin(env: &Env) -> Result<Address, StakingError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::Admin)
+        .ok_or(StakingError::NotInitialized)
+}
+
+/// Helper to get stake token address or return NotInitialized error.
+fn get_stake_token(env: &Env) -> Result<Address, StakingError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::StakeToken)
+        .ok_or(StakingError::NotInitialized)
+}
+
+/// Helper to get reward token address or return NotInitialized error.
+fn get_reward_token(env: &Env) -> Result<Address, StakingError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::RewardToken)
+        .ok_or(StakingError::NotInitialized)
+}
+
+/// Helper to get total staked or return NotInitialized error.
+fn get_total_staked_internal(env: &Env) -> Result<i128, StakingError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::TotalStaked)
+        .ok_or(StakingError::NotInitialized)
+}
+
+/// Helper to get total rewards or return NotInitialized error.
+fn get_total_rewards_internal(env: &Env) -> Result<i128, StakingError> {
+    env.storage()
+        .instance()
+        .get(&DataKey::TotalRewards)
+        .ok_or(StakingError::NotInitialized)
+}
+
 /// Computes how many reward tokens `staker` has earned since their last update.
 fn earned(env: &Env, staker: &Address) -> i128 {
     let stake: i128 = env
@@ -116,7 +156,7 @@ impl StakingContract {
 
         update_reward(&env, &staker);
 
-        let stake_token: Address = env.storage().instance().get(&DataKey::StakeToken).unwrap();
+        let stake_token = get_stake_token(&env)?;
         token::Client::new(&env, &stake_token).transfer(
             &staker,
             &env.current_contract_address(),
@@ -133,7 +173,7 @@ impl StakingContract {
             .persistent()
             .set(&DataKey::Stake(staker.clone()), &new_stake);
 
-        let total: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap();
+        let total = get_total_staked_internal(&env)?;
         env.storage()
             .instance()
             .set(&DataKey::TotalStaked, &(total + amount));
@@ -180,12 +220,12 @@ impl StakingContract {
             .persistent()
             .set(&DataKey::Stake(staker.clone()), &remaining);
 
-        let total: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap();
+        let total = get_total_staked_internal(&env)?;
         env.storage()
             .instance()
             .set(&DataKey::TotalStaked, &(total - amount));
 
-        let stake_token: Address = env.storage().instance().get(&DataKey::StakeToken).unwrap();
+        let stake_token = get_stake_token(&env)?;
         token::Client::new(&env, &stake_token).transfer(
             &env.current_contract_address(),
             &staker,
@@ -223,12 +263,12 @@ impl StakingContract {
             .persistent()
             .set(&DataKey::Rewards(staker.clone()), &0i128);
 
-        let total_rewards: i128 = env.storage().instance().get(&DataKey::TotalRewards).unwrap();
+        let total_rewards = get_total_rewards_internal(&env)?;
         env.storage()
             .instance()
             .set(&DataKey::TotalRewards, &(total_rewards - reward));
 
-        let reward_token: Address = env.storage().instance().get(&DataKey::RewardToken).unwrap();
+        let reward_token = get_reward_token(&env)?;
         token::Client::new(&env, &reward_token).transfer(
             &env.current_contract_address(),
             &staker,
@@ -258,17 +298,17 @@ impl StakingContract {
             return Err(StakingError::InvalidAmount);
         }
 
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin = get_admin(&env)?;
         admin.require_auth();
 
-        let reward_token: Address = env.storage().instance().get(&DataKey::RewardToken).unwrap();
+        let reward_token = get_reward_token(&env)?;
         token::Client::new(&env, &reward_token).transfer(
             &admin,
             &env.current_contract_address(),
             &amount,
         );
 
-        let total_staked: i128 = env.storage().instance().get(&DataKey::TotalStaked).unwrap();
+        let total_staked = get_total_staked_internal(&env)?;
         if total_staked > 0 {
             let rpt: i128 = env
                 .storage()
@@ -280,11 +320,8 @@ impl StakingContract {
                 .instance()
                 .set(&DataKey::RewardPerTokenStored, &new_rpt);
         }
-        // If total_staked == 0, rewards accumulate in TotalRewards and the
-        // RewardPerTokenStored will be updated on the next add_rewards call
-        // once stakers have joined.
 
-        let total_rewards: i128 = env.storage().instance().get(&DataKey::TotalRewards).unwrap();
+        let total_rewards = get_total_rewards_internal(&env)?;
         let new_total = total_rewards + amount;
         env.storage()
             .instance()
