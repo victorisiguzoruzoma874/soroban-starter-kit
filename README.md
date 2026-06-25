@@ -48,6 +48,8 @@ just --list
 | **NFT** | Non-fungible token with admin minting and optional supply cap | Digital collectibles, on-chain ownership, access tokens | ✅ Complete |
 | **DAO** | On-chain governance with token-weighted voting | Protocol upgrades, treasury management, community decisions | ✅ Complete |
 | **Swap** | Atomic two-party token swap with deadline | P2P token exchange, OTC trades, trustless DeFi swaps | ✅ Complete |
+| **Oracle** | Price oracle consumer with staleness validation | DeFi price feeds, on-chain data consumption, freshness checks | ✅ Complete |
+| **Lottery** | Verifiable on-chain lottery with commit-reveal randomness | Raffles, fair draws, decentralised prize distribution | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -132,6 +134,22 @@ just --list
 - **Multi-Swap Support**: Multiple concurrent swaps tracked by auto-incrementing IDs
 - **Token Agnostic**: Works with any pair of Soroban-compatible tokens
 - **Event Emission**: `swap_proposed`, `swap_accepted`, and `swap_cancelled` events
+
+### Oracle Contract Features
+- **Price Feed Consumer**: Admin pushes price updates; consumers read via `get_price`
+- **Staleness Validation**: `get_price` rejects prices older than the configured ledger threshold
+- **Admin-Controlled Updates**: Only the admin may push new prices
+- **Configurable Threshold**: Staleness threshold set at initialization
+- **Event Emission**: `initialized` and `price_updated` events
+- **TTL Management**: Instance storage TTL is extended on every interaction
+
+### Lottery Contract Features
+- **Commit-Reveal Randomness**: Admin commits `hash(secret ++ salt)` before the draw, then reveals to prove fairness
+- **Ticket Purchase**: Any address buys tickets before the admin commits
+- **Verifiable Winner Selection**: Winner index derived from SHA-256 of revealed secret, salt, and ledger sequence
+- **Prize Pool Distribution**: Full ticket pool transferred to winner atomically
+- **State Machine**: Open → Committed → Drawn — each transition is irreversible
+- **Event Emission**: `initialized`, `ticket_purchased`, `committed`, and `winner_drawn` events
 
 Each template includes:
 - ✅ Complete contract implementation
