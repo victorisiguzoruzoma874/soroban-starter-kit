@@ -4,7 +4,7 @@ use crate::admin;
 use crate::errors::EscrowError;
 use crate::events;
 use crate::storage::{DataKey, EscrowState};
-use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
+use soroban_common::{extend_ttl_instance, validate_deadline, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
 use crate::storage::{require_state, DataKey, EscrowState};
 use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
 
@@ -38,9 +38,7 @@ pub fn initialize(
     if buyer == seller || buyer == arbiter || seller == arbiter {
         return Err(EscrowError::InvalidParties);
     }
-    if deadline_ledger < env.ledger().sequence() + MIN_DEADLINE_BUFFER {
-        return Err(EscrowError::DeadlinePassed);
-    }
+    validate_deadline(&env, deadline_ledger).map_err(|_| EscrowError::DeadlinePassed)?;
 
     let token_client = token::Client::new(&env, &token_contract);
     token_client.decimals();
@@ -86,9 +84,7 @@ pub fn initialize_with_arbiters(
             return Err(EscrowError::InvalidParties);
         }
     }
-    if deadline_ledger < env.ledger().sequence() + MIN_DEADLINE_BUFFER {
-        return Err(EscrowError::DeadlinePassed);
-    }
+    validate_deadline(&env, deadline_ledger).map_err(|_| EscrowError::DeadlinePassed)?;
 
     let token_client = token::Client::new(&env, &token_contract);
     token_client.decimals();
