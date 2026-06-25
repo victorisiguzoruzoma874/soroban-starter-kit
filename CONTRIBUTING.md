@@ -306,6 +306,12 @@ Before opening a pull request, confirm all of the following:
 - [ ] The PR title is concise (≤ 70 characters) and follows the format `type: short description` (e.g. `feat: add vesting contract template`)
 - [ ] The PR description references the issue it closes (`Closes #NNN`)
 
+### Conventional Commits
+
+All pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. A CI check will enforce this.
+
+The format is `type(scope): subject`, where `type` is one of: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. The `scope` is optional.
+
 ---
 
 ## Issue Labelling Conventions
