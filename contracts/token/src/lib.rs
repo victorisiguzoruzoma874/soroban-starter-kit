@@ -187,9 +187,10 @@ impl TokenContract {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = supply.checked_add(total_amount).ok_or(TokenError::Overflow)?;
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply + total_amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
         Ok(())
