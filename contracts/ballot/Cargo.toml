@@ -1,0 +1,15 @@
+[package]
+name = "ballot"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+soroban-sdk = { version = "21.5", features = ["contract"] }
+soroban-common = { path = "../common" }
+
+[dev-dependencies]
+soroban-sdk = { version = "21.5", features = ["testutils"] }
