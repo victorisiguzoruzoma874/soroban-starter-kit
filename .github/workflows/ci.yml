@@ -154,20 +154,8 @@ jobs:
 
       - name: Check WASM sizes
         run: |
-          # 200 KB: optimized Soroban contracts typically range 20–100 KB;
-          # 200 KB gives headroom for feature-rich contracts while still
-          # catching runaway bloat before it reaches production.
-          MAX=204800
-          FAILED=0
-          for wasm in target/wasm32-unknown-unknown/release/*.wasm; do
-            size=$(wc -c < "$wasm")
-            echo "$(basename $wasm): $size bytes"
-            if [ "$size" -gt "$MAX" ]; then
-              echo "ERROR: $(basename $wasm) exceeds $MAX bytes ($size)"
-              FAILED=1
-            fi
-          done
-          exit $FAILED
+          pip install jq
+          python3 .github/scripts/check_wasm_sizes.py .github/wasm_sizes.json 1.05
 
       - name: Upload WASM artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
