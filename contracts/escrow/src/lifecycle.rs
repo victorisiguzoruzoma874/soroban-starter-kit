@@ -5,6 +5,8 @@ use crate::errors::EscrowError;
 use crate::events;
 use crate::storage::{DataKey, EscrowState};
 use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
+use crate::storage::{require_state, DataKey, EscrowState};
+use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
 
 use DataKey::*;
 
@@ -16,14 +18,6 @@ pub fn get_required<T: soroban_sdk::TryFromVal<soroban_sdk::Env, soroban_sdk::Va
         .instance()
         .get(key)
         .ok_or(EscrowError::NotInitialized)
-}
-
-pub fn require_state(env: &Env, expected: EscrowState) -> Result<(), EscrowError> {
-    let state: EscrowState = get_required(env, &State)?;
-    if state != expected {
-        return Err(EscrowError::InvalidState);
-    }
-    Ok(())
 }
 
 pub fn initialize(

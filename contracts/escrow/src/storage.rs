@@ -1,4 +1,4 @@
-use soroban_sdk::{contracttype, Address};
+use soroban_sdk::{contracttype, Address, Env};
 
 /// Top-level storage keys used by [`EscrowContract`](crate::EscrowContract).
 ///
@@ -58,6 +58,12 @@ pub enum EscrowState {
     Cancelled = 6,
 }
 
+impl Default for EscrowState {
+    fn default() -> Self {
+        EscrowState::Created
+    }
+}
+
 impl core::fmt::Display for EscrowState {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_str(match self {
@@ -72,9 +78,99 @@ impl core::fmt::Display for EscrowState {
     }
 }
 
+/// Reads the current [`EscrowState`] from instance storage and returns
+/// `Err(EscrowError::InvalidState)` when it does not match `expected`.
+/// Returns `Err(EscrowError::NotInitialized)` when no state has been stored yet.
+pub fn require_state(env: &Env, expected: EscrowState) -> Result<(), crate::errors::EscrowError> {
+    let state: EscrowState = env
+        .storage()
+        .instance()
+        .get(&DataKey::State)
+        .ok_or(crate::errors::EscrowError::NotInitialized)?;
+    if state != expected {
+        return Err(crate::errors::EscrowError::InvalidState);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::EscrowState;
+    use super::{EscrowInfo, EscrowState};
+
+    /// XDR ABI snapshot for [`EscrowInfo`].
+    ///
+    /// `EscrowInfo` is serialised on-chain as an XDR map.  This test pins the
+    /// set of field names (the map keys, sorted alphabetically) as a stored
+    /// snapshot.  If this test fails after a struct change it means the on-chain
+    /// ABI has changed and existing clients will break.
+    #[test]
+    fn test_escrow_info_xdr_snapshot() {
+        use soroban_sdk::{
+            testutils::Address as _,
+            xdr::{Limits, ScVal, ToXdr, WriteXdr},
+            Address, Env, IntoVal, TryFromVal,
+        };
+
+        let env = Env::default();
+        let buyer = Address::generate(&env);
+        let seller = Address::generate(&env);
+        let arbiter = Address::generate(&env);
+        let token_contract = Address::generate(&env);
+
+        let info = EscrowInfo {
+            buyer: buyer.clone(),
+            seller: seller.clone(),
+            arbiter: arbiter.clone(),
+            token_contract: token_contract.clone(),
+            amount: 1_000i128,
+            deadline: 500u32,
+            state: EscrowState::Created,
+        };
+
+        // Round-trip: encode → decode must produce the same value.
+        // A failure here means the XDR encoding changed and is no longer
+        // self-consistent — that is always a breaking ABI change.
+        let val: soroban_sdk::Val = info.clone().into_val(&env);
+        let decoded =
+            EscrowInfo::try_from_val(&env, &val).expect("EscrowInfo XDR round-trip failed");
+        assert_eq!(decoded, info, "EscrowInfo XDR round-trip produced a different value");
+
+        // Structural snapshot: the XDR map must have exactly these 7 keys,
+        // in alphabetical order.  Hard-coded here as the stored snapshot.
+        // Changing this list is a breaking on-chain ABI change.
+        let sc_val = ScVal::try_from_val(&env, &val).expect("Val → ScVal failed");
+        let keys: std::vec::Vec<std::string::String> = match &sc_val {
+            ScVal::Map(Some(map)) => map
+                .0
+                .iter()
+                .map(|entry| match &entry.key {
+                    ScVal::Symbol(sym) => sym.0.to_utf8_string().expect("symbol is valid utf8"),
+                    other => panic!("expected Symbol key, got {:?}", other),
+                })
+                .collect(),
+            other => panic!("EscrowInfo must encode as ScVal::Map, got {:?}", other),
+        };
+
+        // Stored snapshot — DO NOT change without a migration plan.
+        assert_eq!(
+            keys,
+            [
+                "amount",
+                "arbiter",
+                "buyer",
+                "deadline",
+                "seller",
+                "state",
+                "token_contract"
+            ],
+            "EscrowInfo XDR field names changed — breaking on-chain ABI"
+        );
+    }
+
+    #[test]
+    fn test_escrow_state_default() {
+        assert_eq!(EscrowState::default(), EscrowState::Created);
+    }
 
     #[test]
     fn test_escrow_state_display() {
@@ -136,6 +232,19 @@ mod discriminant_tests {
 
 /// Snapshot of all escrow fields returned by
 /// [`EscrowContract::get_escrow_info`](crate::EscrowContract::get_escrow_info).
+///
+/// # ABI stability
+///
+/// `EscrowInfo` is serialised on-chain as an XDR map whose entries are keyed by
+/// field name and sorted alphabetically.  The stable key order is:
+///
+/// `amount`, `arbiter`, `buyer`, `deadline`, `seller`, `state`, `token_contract`
+///
+/// **Renaming, adding, or removing any field is a breaking on-chain ABI change.**
+/// Off-chain clients (SDKs, indexers, test harnesses) that decode this type from
+/// raw XDR will break silently if the set of field names changes.  Any such change
+/// must increment the on-chain contract version, provide a migration path, and be
+/// called out explicitly in `CHANGELOG.md`.
 #[contracttype]
 #[derive(Clone, Debug, PartialEq)]
 pub struct EscrowInfo {

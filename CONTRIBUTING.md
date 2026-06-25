@@ -203,6 +203,20 @@ Additional conventions:
 - Keep storage key enums in `storage.rs`; keep event helpers in `events.rs`.
 - Prefer `checked_add` / `checked_sub` over raw arithmetic to avoid silent overflow.
 
+### XDR ABI stability
+
+`#[contracttype]` structs (e.g. `EscrowInfo`) are serialised on-chain as XDR maps
+keyed by **field name**.  The field names — and their types — are therefore part of
+the **public on-chain ABI**.
+
+- **Do not rename, add, or remove fields** without a migration plan and a contract
+  version bump.
+- The exact set of field names is pinned by an XDR snapshot test in
+  `contracts/escrow/src/storage.rs` (`test_escrow_info_xdr_snapshot`).  If you
+  intentionally change the struct, update the snapshot constant in that test,
+  document the breaking change in `CHANGELOG.md`, and increment the on-chain
+  contract version.
+
 ---
 
 ## DataKey Variant Stability

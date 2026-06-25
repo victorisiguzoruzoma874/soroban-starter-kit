@@ -6,6 +6,7 @@ use soroban_sdk::{
 };
 
 mod admin;
+mod allowance;
 mod errors;
 mod events;
 mod storage;
@@ -15,6 +16,7 @@ mod token_interface;
 mod test;
 
 use admin::require_admin;
+use allowance::get_allowance;
 use errors::TokenError;
 use soroban_common::{extend_ttl_instance, extend_ttl_persistent, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 use storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
