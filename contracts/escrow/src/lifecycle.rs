@@ -166,7 +166,7 @@ pub fn fund(env: Env) -> Result<(), EscrowError> {
     extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
-        .publish((Symbol::new(&env, "escrow_funded"), buyer), amount);
+        .publish((Symbol::new(&env, "funded"), buyer), amount);
 
     Ok(())
 }
@@ -187,7 +187,7 @@ pub fn mark_delivered(env: Env) -> Result<(), EscrowError> {
     extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
     env.events()
-        .publish((Symbol::new(&env, "delivery_marked"), seller), ());
+        .publish((Symbol::new(&env, "marked_delivered"), seller), ());
 
     Ok(())
 }
@@ -334,7 +334,7 @@ pub fn release_to_seller(env: Env) -> Result<(), EscrowError> {
     admin::transfer_token(&env, &env.current_contract_address(), &seller, amount);
 
     env.events()
-        .publish((Symbol::new(&env, "funds_released"), seller), amount);
+        .publish((Symbol::new(&env, "released"), seller), amount);
 
     Ok(())
 }

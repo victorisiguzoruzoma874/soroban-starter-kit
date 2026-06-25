@@ -9,7 +9,7 @@ pub fn initialized(env: &Env, admin: &Address, token: &Address, quorum: i128) {
 
 pub fn proposal_created(env: &Env, proposer: &Address, proposal_id: u32) {
     env.events().publish(
-        (Symbol::new(env, "proposal_created"), proposer.clone()),
+        (Symbol::new(env, "created"), proposer.clone()),
         proposal_id,
     );
 }
@@ -23,12 +23,12 @@ pub fn voted(env: &Env, voter: &Address, proposal_id: u32, support: bool, weight
 
 pub fn proposal_executed(env: &Env, proposal_id: u32) {
     env.events()
-        .publish((Symbol::new(env, "prop_executed"),), proposal_id);
+        .publish((Symbol::new(env, "executed"),), proposal_id);
 }
 
 pub fn proposal_cancelled(env: &Env, admin: &Address, proposal_id: u32) {
     env.events().publish(
-        (Symbol::new(env, "prop_cancelled"), admin.clone()),
+        (Symbol::new(env, "cancelled"), admin.clone()),
         proposal_id,
     );
 }
