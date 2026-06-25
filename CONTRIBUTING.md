@@ -51,6 +51,20 @@ cargo install cargo-udeps --locked
 cargo +nightly udeps --workspace --all-targets
 ```
 
+### cargo-semver-checks (breaking API changes)
+
+The `semver` CI job runs `cargo semver-checks` on every PR to detect breaking public API changes in `soroban-token-template` and `soroban-escrow-template`.
+
+**Semver policy:** This repository follows [Semantic Versioning](https://semver.org/). Any change that removes, renames, or changes the signature of a public contract entry point, error type, or event is a **breaking change** and requires a major version bump. Adding new public items is backwards-compatible and requires only a minor bump. Bug fixes with no API change require a patch bump.
+
+Install locally:
+
+```bash
+cargo install cargo-semver-checks --locked
+cargo semver-checks -p soroban-token-template
+cargo semver-checks -p soroban-escrow-template
+```
+
 ---
 
 ## Code style
