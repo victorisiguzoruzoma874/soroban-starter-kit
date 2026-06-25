@@ -44,3 +44,65 @@ pub enum MetadataKey {
     Symbol,
     Decimals,
 }
+
+#[cfg(test)]
+mod discriminant_tests {
+    use super::*;
+    use soroban_sdk::{testutils::Address as _, Address, Env};
+
+    // In Soroban, #[contracttype] enums use the variant NAME as the XDR storage discriminant.
+    // NEVER rename, reorder, or remove variants — doing so will corrupt on-chain storage for
+    // any live deployment. To add a new key, append it at the END of the enum definition.
+    //
+    // This exhaustive match is the primary guard: it causes a COMPILE ERROR if a variant is
+    // renamed or removed, and a non-exhaustive warning if one is added without updating here.
+    fn token_data_key_index(key: &DataKey) -> u32 {
+        match key {
+            DataKey::Admin => 0,
+            DataKey::PendingAdmin => 1,
+            DataKey::Balance(_) => 2,
+            DataKey::Allowance(_) => 3,
+            DataKey::Metadata(_) => 4,
+            DataKey::TotalSupply => 5,
+            DataKey::Paused => 6,
+            DataKey::MaxSupply => 7,
+            DataKey::PendingUpgrade => 8,
+            DataKey::Version => 9,
+            DataKey::Frozen(_) => 10,
+        }
+    }
+
+    fn metadata_key_index(key: &MetadataKey) -> u32 {
+        match key {
+            MetadataKey::Name => 0,
+            MetadataKey::Symbol => 1,
+            MetadataKey::Decimals => 2,
+        }
+    }
+
+    #[test]
+    fn data_key_discriminants_are_stable() {
+        let env = Env::default();
+        let addr = Address::generate(&env);
+        let allowance_key = AllowanceDataKey { from: addr.clone(), spender: addr.clone() };
+
+        assert_eq!(token_data_key_index(&DataKey::Admin), 0);
+        assert_eq!(token_data_key_index(&DataKey::PendingAdmin), 1);
+        assert_eq!(token_data_key_index(&DataKey::Balance(addr.clone())), 2);
+        assert_eq!(token_data_key_index(&DataKey::Allowance(allowance_key)), 3);
+        assert_eq!(token_data_key_index(&DataKey::Metadata(MetadataKey::Name)), 4);
+        assert_eq!(token_data_key_index(&DataKey::TotalSupply), 5);
+        assert_eq!(token_data_key_index(&DataKey::Paused), 6);
+        assert_eq!(token_data_key_index(&DataKey::MaxSupply), 7);
+        assert_eq!(token_data_key_index(&DataKey::PendingUpgrade), 8);
+        assert_eq!(token_data_key_index(&DataKey::Version), 9);
+        assert_eq!(token_data_key_index(&DataKey::Frozen(addr)), 10);
+    }
+
+    #[test]
+    fn metadata_key_discriminants_are_stable() {
+        assert_eq!(metadata_key_index(&MetadataKey::Name), 0);
+        assert_eq!(metadata_key_index(&MetadataKey::Symbol), 1);
+        assert_eq!(metadata_key_index(&MetadataKey::Decimals), 2);
+    }
+}

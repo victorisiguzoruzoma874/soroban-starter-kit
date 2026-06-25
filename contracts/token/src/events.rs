@@ -56,21 +56,18 @@ pub fn transferred(env: &Env, from: &Address, to: &Address, amount: i128) {
 
 /// Emitted when the contract is paused.
 /// Topics: (Symbol, Address) — event name, admin
-#[allow(dead_code)]
 pub fn paused(env: &Env, admin: &Address) {
     env.events().publish((Symbol::new(env, "paused"), admin.clone()), ());
 }
 
 /// Emitted when the contract is unpaused.
 /// Topics: (Symbol, Address) — event name, admin
-#[allow(dead_code)]
 pub fn unpaused(env: &Env, admin: &Address) {
     env.events().publish((Symbol::new(env, "unpaused"), admin.clone()), ());
 }
 
 /// Emitted when the contract is upgraded.
 /// Topics: (Symbol, Address) — event name, admin
-#[allow(dead_code)]
 pub fn upgraded(env: &Env, admin: &Address, new_wasm_hash: &soroban_sdk::BytesN<32>) {
     env.events().publish((Symbol::new(env, "upgraded"), admin.clone()), new_wasm_hash.clone());
 }

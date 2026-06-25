@@ -206,6 +206,91 @@ cargo fuzz run token_fuzz -- corpus/
 ```bash
 RUST_BACKTRACE=1 cargo fuzz run token_fuzz -- fuzz/artifacts/token_fuzz/crash-*
 ```
+## Debugging Macros
+
+Soroban contracts rely heavily on proc macros (`#[contract]`, `#[contractimpl]`, `#[contracttype]`, etc.). When macro-related errors are cryptic or the generated code behaves unexpectedly, `cargo-expand` lets you inspect the exact Rust code the macros emit.
+
+### Installing cargo-expand
+
+```bash
+cargo install cargo-expand
+```
+
+`cargo-expand` requires the nightly toolchain to pretty-print expanded output:
+
+```bash
+rustup toolchain install nightly
+```
+
+### Example Commands
+
+**Expand an entire contract file:**
+
+```bash
+# From the contract's crate directory (e.g. contracts/token)
+cargo +nightly expand
+```
+
+**Expand a specific module:**
+
+```bash
+cargo +nightly expand token
+```
+
+**Expand a specific item (struct, impl block, function):**
+
+```bash
+cargo +nightly expand --lib token::Token
+```
+
+**Expand and pipe to a file for easier inspection:**
+
+```bash
+cargo +nightly expand > expanded.rs
+```
+
+**Expand with all features enabled:**
+
+```bash
+cargo +nightly expand --all-features
+```
+
+**Expand for the wasm32 target (matches the actual build target):**
+
+```bash
+cargo +nightly expand --target wasm32-unknown-unknown
+```
+
+### Common Macro Expansion Issues
+
+**`#[contract]` / `#[contractimpl]` not generating expected trait impls**
+
+Run `cargo +nightly expand` and search for the `IntoVal` / `TryFromVal` implementations. If they are missing, check that:
+- The struct derives or is annotated correctly (`#[contract]` on the struct, `#[contractimpl]` on the `impl` block).
+- There is no conflicting manual `impl` of the same trait in the expanded output.
+
+**Mysterious "method not found" or "trait bound not satisfied" errors**
+
+These often mean a macro failed silently. Expand the file and look for `compile_error!` calls or incomplete `impl` blocks in the output — they indicate which macro panicked and why.
+
+**`#[contracttype]` enum/struct not serializing correctly**
+
+Expand the type and verify the generated `ScVal` conversion arms match your expected variants. A missing `#[contracttype]` on a nested type will produce a stub that falls back to a raw `ScVal::Void`.
+
+**Duplicate symbol errors when building for wasm32**
+
+Expand with `--target wasm32-unknown-unknown` to see if two macros are emitting the same symbol. The duplicated `fn __call` or `fn __spec` entry in the expansion points to the conflicting `#[contractimpl]` block.
+
+**Expanded output is unreadable**
+
+Use `rustfmt` to format the expanded output:
+
+```bash
+cargo +nightly expand | rustfmt --edition 2021 > expanded.rs
+```
+
+---
+
 ## Secrets Management
 
 ### Golden rules

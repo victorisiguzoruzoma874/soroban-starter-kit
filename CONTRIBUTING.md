@@ -219,6 +219,36 @@ the **public on-chain ABI**.
 
 ---
 
+## DataKey Variant Stability
+
+`DataKey` enums (in `contracts/*/src/storage.rs`) define the on-chain storage layout for each contract. In Soroban, `#[contracttype]` enums use the **variant name** as the XDR storage discriminant. Changing any variant in an incompatible way corrupts storage for any live deployment.
+
+### Rules
+
+| Operation | Effect | Allowed? |
+|-----------|--------|----------|
+| Rename a variant | Changes its XDR key — existing storage entries become unreachable | **Never** |
+| Remove a variant | Same as rename from the runtime's perspective | **Never** |
+| Reorder variants | Changes the numeric fallback index in some SDK versions | **Never** |
+| Add a variant | Appending at the **end** is safe; inserting in the middle is not | **Append only** |
+
+### How to add a new storage key
+
+1. Open `contracts/<name>/src/storage.rs`.
+2. Add the new variant at the **bottom** of the `DataKey` enum, after all existing variants.
+3. Update the exhaustive `match` in `discriminant_tests::*_data_key_index` to include the new variant with the next sequential index.
+4. Run the tests: `cargo test -p <package>`.
+
+### Why the tests use an exhaustive match
+
+The `discriminant_tests` module in each `storage.rs` contains an exhaustive `match` over `DataKey`. This is intentional:
+
+- **Compile error** if a variant is renamed or removed (the old name no longer exists).
+- **Non-exhaustive warning** (treated as an error in CI) if a variant is added without updating the match.
+- **Runtime assertions** document the expected position of each variant and serve as a human-readable snapshot of the storage layout.
+
+---
+
 ## Adding a New Contract Template
 
 For the full step-by-step guide, see [docs/adding-a-contract.md](docs/adding-a-contract.md).

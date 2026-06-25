@@ -18,20 +18,8 @@ mod test;
 use admin::require_admin;
 use allowance::get_allowance;
 use errors::TokenError;
-use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
+use soroban_common::{extend_ttl_instance, extend_ttl_persistent, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 use storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
-
-pub(crate) fn bump_instance(env: &Env) {
-    env.storage()
-        .instance()
-        .extend_ttl(LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-}
-
-pub(crate) fn bump_persistent(env: &Env, key: &DataKey) {
-    env.storage()
-        .persistent()
-        .extend_ttl(key, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-}
 
 #[cfg(feature = "pausable")]
 pub(crate) fn require_not_paused(env: &Env) -> Result<(), TokenError> {
@@ -98,7 +86,7 @@ impl TokenContract {
         }
         #[cfg(not(feature = "capped-supply"))]
         let _ = max_supply;
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::initialized(&env, &admin, name, symbol, decimals);
         Ok(())
     }
@@ -138,7 +126,7 @@ impl TokenContract {
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &(supply + amount));
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::minted(&env, &to, amount);
         Ok(())
     }
@@ -189,7 +177,7 @@ impl TokenContract {
             env.storage()
                 .persistent()
                 .set(&DataKey::Balance(to.clone()), &new_balance);
-            bump_persistent(&env, &DataKey::Balance(to.clone()));
+            extend_ttl_persistent(&env, &DataKey::Balance(to.clone()), LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
             events::minted(&env, &to, amount);
         }
 
@@ -201,7 +189,7 @@ impl TokenContract {
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &(supply + total_amount));
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
         Ok(())
     }
@@ -224,7 +212,7 @@ impl TokenContract {
         env.storage()
             .instance()
             .set(&DataKey::TotalSupply, &(supply.checked_sub(amount).ok_or(TokenError::Overflow)?));
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::burned(&env, &from, amount);
         Ok(())
     }
@@ -234,7 +222,7 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::PendingAdmin, &new_admin);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::admin_proposed(&env, &admin, &new_admin);
         Ok(())
     }
@@ -249,7 +237,7 @@ impl TokenContract {
         pending.require_auth();
         env.storage().instance().set(&DataKey::Admin, &pending);
         env.storage().instance().remove(&DataKey::PendingAdmin);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::admin_accepted(&env, &pending);
         Ok(())
     }
@@ -259,7 +247,7 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().remove(&DataKey::PendingAdmin);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::admin_proposal_cancelled(&env, &admin);
         Ok(())
     }
@@ -269,7 +257,7 @@ impl TokenContract {
         let old_admin = require_admin(&env)?;
         old_admin.require_auth();
         env.storage().instance().set(&DataKey::Admin, &new_admin);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::admin_changed(&env, &old_admin, &new_admin);
         Ok(())
     }
@@ -333,7 +321,7 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::paused(&env, &admin);
         Ok(())
     }
@@ -342,7 +330,7 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &false);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::unpaused(&env, &admin);
         Ok(())
     }
@@ -356,7 +344,7 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Frozen(account.clone()), &true);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "account_frozen"), account),
             (),
@@ -368,7 +356,7 @@ impl TokenContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Frozen(account.clone()), &false);
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "account_unfrozen"), account),
             (),
@@ -390,7 +378,7 @@ impl TokenContract {
         env.storage()
             .instance()
             .set(&DataKey::PendingUpgrade, &(wasm_hash.clone(), ready_after));
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "upgrade_proposed"), admin),
             (wasm_hash, ready_after),
@@ -418,7 +406,7 @@ impl TokenContract {
         env.storage()
             .instance()
             .set(&DataKey::Version, &(current_version + 1));
-        bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::upgraded(&env, &admin, &wasm_hash);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "upgrade_executed"), admin),
@@ -453,7 +441,7 @@ impl TokenContract {
         env.storage()
             .persistent()
             .set(&DataKey::Balance(account.clone()), &new_balance);
-        bump_persistent(env, &DataKey::Balance(account.clone()));
+        extend_ttl_persistent(env, &DataKey::Balance(account.clone()), LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         Ok(())
     }
 

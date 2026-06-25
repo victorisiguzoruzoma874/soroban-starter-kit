@@ -1,6 +1,7 @@
 #![no_std]
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env};
+use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 
 mod admin;
 mod dispute;
@@ -126,7 +127,7 @@ impl EscrowContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &true);
-        lifecycle::bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::paused(&env, &admin);
         Ok(())
     }
@@ -135,7 +136,7 @@ impl EscrowContract {
         let admin = require_admin(&env)?;
         admin.require_auth();
         env.storage().instance().set(&DataKey::Paused, &false);
-        lifecycle::bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::unpaused(&env, &admin);
         Ok(())
     }
@@ -152,7 +153,7 @@ impl EscrowContract {
         env.storage()
             .instance()
             .set(&DataKey::PendingUpgrade, &(wasm_hash.clone(), ready_after));
-        lifecycle::bump_instance(&env);
+        extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         env.events().publish(
             (soroban_sdk::Symbol::new(&env, "upgrade_proposed"), admin),
             (wasm_hash, ready_after),

@@ -189,6 +189,27 @@ jobs:
           path: target/wasm32-unknown-unknown/release/*.wasm
           retention-days: 7
 
+  datakey-discriminants:
+    name: DataKey Discriminant Stability
+    runs-on: ubuntu-latest
+    needs: [fmt, clippy]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Check token DataKey discriminants
+        run: cargo test -p soroban-token-template -- discriminant_tests --nocapture
+
+      - name: Check escrow DataKey discriminants
+        run: cargo test -p soroban-escrow-template -- discriminant_tests --nocapture
+
   security-audit:
     name: Security Audit
   machete:
