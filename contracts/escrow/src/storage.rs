@@ -40,7 +40,7 @@ pub enum DataKey {
 /// `Created → Funded → Delivered → Completed`
 /// with side exits to `Refunded` or `Cancelled`.
 #[contracttype]
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum EscrowState {
     /// Escrow has been initialized but not yet funded.
     Created = 0,
@@ -181,6 +181,15 @@ mod tests {
         assert_eq!(EscrowState::Completed.to_string(), "completed");
         assert_eq!(EscrowState::Refunded.to_string(), "refunded");
         assert_eq!(EscrowState::Cancelled.to_string(), "cancelled");
+    }
+
+    #[test]
+    fn test_escrow_state_ordering() {
+        assert!(EscrowState::Created < EscrowState::Funded);
+        assert!(EscrowState::Funded < EscrowState::Delivered);
+        assert!(EscrowState::Delivered < EscrowState::Disputed);
+        assert!(EscrowState::Funded >= EscrowState::Created);
+        assert_eq!(EscrowState::Created, EscrowState::Created);
     }
 }
 
