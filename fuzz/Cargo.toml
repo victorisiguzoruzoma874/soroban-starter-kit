@@ -9,11 +9,24 @@ publish = false
 [dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
 soroban-token-template = { path = "../contracts/token" }
+soroban-escrow-template = { path = "../contracts/escrow" }
 libfuzzer-sys = "0.4"
 
 [[bin]]
 name = "token_fuzz"
 path = "fuzz_targets/token_fuzz.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "escrow_initialize"
+path = "fuzz_targets/escrow_initialize.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "token_mint_burn"
+path = "fuzz_targets/token_mint_burn.rs"
 test = false
 doc = false
 
