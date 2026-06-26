@@ -380,5 +380,6 @@ See [security.md](security.md) for detailed security analysis, including:
 - [ADR-0001: Storage Tier Choices](adr/0001-storage-tier-choices.md)
 - [ADR-0003: Admin Model](adr/0003-admin-model.md)
 - [ADR-0004: Escrow State Machine Design](adr/0004-escrow-state-machine.md)
+- [Storage Layout Documentation](storage-layout.md)
 - [Integration Guide](integration-guide.md)
 - [Deployment Guide](deployment-guide.md)
