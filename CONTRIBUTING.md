@@ -91,6 +91,7 @@ Thanks for taking the time to contribute. This guide covers everything you need 
 - [Running Tests](#running-tests)
 - [Code Style](#code-style)
 - [Adding a New Contract Template](#adding-a-new-contract-template)
+- [CHANGELOG Format](#changelog-format)
 - [PR Checklist](#pr-checklist)
 - [Issue Labelling Conventions](#issue-labelling-conventions)
 - [PR Review Process](#pr-review-process)
@@ -303,6 +304,49 @@ Follow these steps to add a contract that fits the existing project structure:
 5. **CHANGELOG update**
 
    Add an entry under `[Unreleased]` in `CHANGELOG.md` describing the new template.
+
+---
+
+## CHANGELOG Format
+
+This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Every PR must include a CHANGELOG entry under `[Unreleased]` describing the changes.
+
+### Entry Categories
+
+Use one of these categories for each entry:
+
+| Category | Use For |
+|----------|---------|
+| **Added** | New features, contracts, documentation, or functionality |
+| **Changed** | Changes to existing features or behavior; backwards-compatible updates |
+| **Fixed** | Bug fixes and corrections |
+| **Removed** | Removed features or deprecations |
+| **Security** | Security-related fixes and patches |
+
+### Example Entry
+
+```markdown
+## [Unreleased]
+
+### Added
+- `ADR 0008: Multi-sig Arbiter Design` — documents N-of-M vote accumulation pattern for dispute resolution (#670)
+- `docs/event-catalogue.md` — comprehensive reference of all emitted events with topics and data schemas (#669)
+- `docs/storage-layout.md` — storage tier and TTL policy documentation per contract (#668)
+
+### Fixed
+- Race condition in token transfer when paused (#123)
+
+### Changed
+- Simplified escrow state machine transitions (#456)
+```
+
+### Guidelines
+
+1. **Keep entries brief and specific** — one to three sentences per change. Link to the PR.
+2. **Use bullet points** — start with action (e.g. "Added", "Fixed", "Documented").
+3. **Link to issues** — include `(#NNN)` at the end to reference the GitHub issue closed by your PR.
+4. **One PR = one entry** — if your PR has multiple independent changes, list them separately.
+5. **Update before finalizing the PR** — don't forget this step; CI will check that `[Unreleased]` has been modified.
 
 ---
 
