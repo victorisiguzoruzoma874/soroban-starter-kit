@@ -80,6 +80,73 @@ cargo semver-checks -p soroban-escrow-template
 - Confirm that Protocol 22 fee schedule values are still correct and update any
   stale network fee assumptions.
 
+## Upgrading soroban-sdk
+
+The SDK version is pinned with an exact constraint (`=21.7.7`) in
+`[workspace.dependencies]` in the root `Cargo.toml` to guarantee reproducible
+builds across all developers and CI.
+
+### Finding the latest stable release
+
+```bash
+cargo search soroban-sdk | head -5
+# or browse https://crates.io/crates/soroban-sdk/versions
+```
+
+Check the [Stellar Protocol changelog](https://github.com/stellar/stellar-protocol)
+for protocol-breaking changes before upgrading across major versions.
+
+### Upgrade steps
+
+1. **Update the version pin** in `Cargo.toml`:
+
+   ```toml
+   [workspace.dependencies]
+   soroban-sdk = "=<NEW_VERSION>"
+   soroban-sdk-testutils = { version = "=<NEW_VERSION>", package = "soroban-sdk", features = ["testutils"] }
+   ```
+
+2. **Regenerate the lockfile**:
+
+   ```bash
+   cargo update -p soroban-sdk
+   ```
+
+3. **Check for breaking changes** — compile the workspace first:
+
+   ```bash
+   cargo check --workspace --all-targets
+   ```
+
+   Common breaking-change patterns to watch for:
+   - Renamed or removed items in `soroban_sdk::{Address, Env, Symbol, …}`
+   - Changed `#[contracttype]` / `#[contractimpl]` macro signatures
+   - New required trait impls for `Val` / `TryFromVal`
+   - Altered `token::Client` method signatures
+
+4. **Run the full test suite**, including feature-flagged variants:
+
+   ```bash
+   cargo test --workspace
+   cargo test -p soroban-escrow-template --features pausable,upgradeable
+   cargo test -p soroban-token-template --features pausable,capped-supply
+   ```
+
+5. **Run benchmarks** to catch performance regressions:
+
+   ```bash
+   cargo criterion --package contract-benchmarks
+   ```
+
+6. **Update docs** — edit `docs/gas-costs.md` to reflect the new protocol
+   version and re-verify fee schedule values.
+
+7. **Update this file** — change the version reference in the Prerequisites
+   table and this section to match the new pinned version.
+
+8. Open a PR with **only** the SDK bump and its fixes — do not mix unrelated
+   changes so reviewers can easily evaluate the upgrade diff.
+
 # Contributing to Soroban Starter Kit
 
 Thanks for taking the time to contribute. This guide covers everything you need to get set up, write good code, and get your changes merged.
@@ -91,6 +158,7 @@ Thanks for taking the time to contribute. This guide covers everything you need 
 - [Running Tests](#running-tests)
 - [Code Style](#code-style)
 - [Adding a New Contract Template](#adding-a-new-contract-template)
+- [CHANGELOG Format](#changelog-format)
 - [PR Checklist](#pr-checklist)
 - [Issue Labelling Conventions](#issue-labelling-conventions)
 - [PR Review Process](#pr-review-process)
@@ -306,6 +374,49 @@ Follow these steps to add a contract that fits the existing project structure:
 
 ---
 
+## CHANGELOG Format
+
+This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Every PR must include a CHANGELOG entry under `[Unreleased]` describing the changes.
+
+### Entry Categories
+
+Use one of these categories for each entry:
+
+| Category | Use For |
+|----------|---------|
+| **Added** | New features, contracts, documentation, or functionality |
+| **Changed** | Changes to existing features or behavior; backwards-compatible updates |
+| **Fixed** | Bug fixes and corrections |
+| **Removed** | Removed features or deprecations |
+| **Security** | Security-related fixes and patches |
+
+### Example Entry
+
+```markdown
+## [Unreleased]
+
+### Added
+- `ADR 0008: Multi-sig Arbiter Design` — documents N-of-M vote accumulation pattern for dispute resolution (#670)
+- `docs/event-catalogue.md` — comprehensive reference of all emitted events with topics and data schemas (#669)
+- `docs/storage-layout.md` — storage tier and TTL policy documentation per contract (#668)
+
+### Fixed
+- Race condition in token transfer when paused (#123)
+
+### Changed
+- Simplified escrow state machine transitions (#456)
+```
+
+### Guidelines
+
+1. **Keep entries brief and specific** — one to three sentences per change. Link to the PR.
+2. **Use bullet points** — start with action (e.g. "Added", "Fixed", "Documented").
+3. **Link to issues** — include `(#NNN)` at the end to reference the GitHub issue closed by your PR.
+4. **One PR = one entry** — if your PR has multiple independent changes, list them separately.
+5. **Update before finalizing the PR** — don't forget this step; CI will check that `[Unreleased]` has been modified.
+
+---
+
 ## PR Checklist
 
 Before opening a pull request, confirm all of the following:
@@ -343,6 +454,39 @@ The format is `type(scope): subject`, where `type` is one of: `feat`, `fix`, `do
 | `security` | Security-related finding — follow `SECURITY.md` for disclosure |
 | `ci` | Changes to CI/CD workflows or tooling |
 | `breaking change` | Introduces a backwards-incompatible change |
+
+---
+
+## Branch Protection Rules
+
+The `main` branch is protected with the following rules:
+
+| Rule | Enforcement |
+|------|------------|
+| Require PR reviews | Minimum **1 approval** required before merge |
+| Require status checks | All GitHub Actions workflows must pass: `ci`, `lint-pr-title`, `bench`, `pr-labeler` |
+| Require branches up to date | Branch must be up-to-date with `main` before merge |
+| Restrict who can push | Only authorized maintainers can merge PRs |
+| Allow force pushes | Disabled — prevents accidental history rewriting |
+| Allow deletions | Disabled — protects branch from accidents |
+| Require code owner review | Enabled — CODEOWNERS file is enforced |
+
+### Status Checks Required for Merge
+
+All of the following must pass **before review begins**:
+
+1. **`ci`** — Runs `cargo test --workspace`, `cargo clippy`, `cargo fmt --check`, `cargo machete`, and WASM size verification
+2. **`lint-pr-title`** — Validates PR title follows Conventional Commits format
+3. **`bench`** — Gas/time benchmarks for escrow and token operations (informational)
+4. **`pr-labeler`** — Auto-applies labels based on file changes (informational)
+
+### What Contributors Must Know
+
+- **Never force-push** to `main` or any branch with a PR open
+- **Wait for 1 approval** from a maintainer before merging (maintainers merge, not authors)
+- **Keep your branch up to date** — GitHub will prevent merge if `main` has new commits
+- **Rebase or merge** to sync with main before requesting final review
+- **CI failures block review** — fix all failed checks first, then re-request review
 
 ---
 

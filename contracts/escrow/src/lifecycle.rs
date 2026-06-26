@@ -1,12 +1,10 @@
-use soroban_sdk::{token, Address, Env, Symbol};
+use soroban_sdk::{token, Address, Env, Symbol, Vec};
 
 use crate::admin;
 use crate::errors::EscrowError;
 use crate::events;
-use crate::storage::{DataKey, EscrowState};
-use soroban_common::{extend_ttl_instance, validate_deadline, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
 use crate::storage::{require_state, DataKey, EscrowState};
-use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD, MIN_DEADLINE_BUFFER};
+use soroban_common::{extend_ttl_instance, validate_deadline, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 
 use DataKey::*;
 
@@ -18,6 +16,57 @@ pub fn get_required<T: soroban_sdk::TryFromVal<soroban_sdk::Env, soroban_sdk::Va
         .instance()
         .get(key)
         .ok_or(EscrowError::NotInitialized)
+}
+
+fn validate_amount(amount: i128) -> Result<(), EscrowError> {
+    if amount <= 0 {
+        return Err(EscrowError::InvalidAmount);
+    }
+    Ok(())
+}
+
+fn validate_parties(buyer: &Address, seller: &Address, arbiter: &Address) -> Result<(), EscrowError> {
+    if buyer == seller || buyer == arbiter || seller == arbiter {
+        return Err(EscrowError::InvalidParties);
+    }
+    Ok(())
+}
+
+fn validate_parties_multi(buyer: &Address, seller: &Address, arbiters: &Vec<Address>, required_signatures: u32) -> Result<(), EscrowError> {
+    if arbiters.is_empty() || required_signatures == 0 || required_signatures > arbiters.len() as u32 {
+        return Err(EscrowError::InvalidParties);
+    }
+    for arbiter in arbiters.iter() {
+        if &arbiter == buyer || &arbiter == seller {
+            return Err(EscrowError::InvalidParties);
+        }
+    }
+    Ok(())
+}
+
+fn store_escrow_data(
+    env: &Env,
+    buyer: &Address,
+    seller: &Address,
+    arbiter: &Address,
+    token_contract: &Address,
+    amount: i128,
+    deadline_ledger: u32,
+    required_signatures: u32,
+) {
+    env.storage().instance().set(&Buyer, buyer);
+    env.storage().instance().set(&Seller, seller);
+    env.storage().instance().set(&Arbiter, arbiter);
+    env.storage().instance().set(&TokenContract, token_contract);
+    env.storage().instance().set(&Amount, &amount);
+    env.storage().instance().set(&Deadline, &deadline_ledger);
+    env.storage().instance().set(&State, &EscrowState::Created);
+    env.storage().instance().set(&RequiredSignatures, &required_signatures);
+}
+
+fn emit_init_events(env: &Env, buyer: &Address, seller: &Address, arbiter: &Address, amount: i128) {
+    events::escrow_created(env, buyer, seller, amount);
+    events::initialized(env, buyer, seller, arbiter, amount);
 }
 
 pub fn initialize(
@@ -32,31 +81,13 @@ pub fn initialize(
     if env.storage().instance().has(&State) {
         return Err(EscrowError::AlreadyInitialized);
     }
-    if amount <= 0 {
-        return Err(EscrowError::InvalidAmount);
-    }
-    if buyer == seller || buyer == arbiter || seller == arbiter {
-        return Err(EscrowError::InvalidParties);
-    }
+    validate_amount(amount)?;
+    validate_parties(&buyer, &seller, &arbiter)?;
     validate_deadline(&env, deadline_ledger).map_err(|_| EscrowError::DeadlinePassed)?;
-
-    let token_client = token::Client::new(&env, &token_contract);
-    token_client.decimals();
-
-    env.storage().instance().set(&Buyer, &buyer);
-    env.storage().instance().set(&Seller, &seller);
-    env.storage().instance().set(&Arbiter, &arbiter);
-    env.storage().instance().set(&TokenContract, &token_contract);
-    env.storage().instance().set(&Amount, &amount);
-    env.storage().instance().set(&Deadline, &deadline_ledger);
-    env.storage().instance().set(&State, &EscrowState::Created);
-    env.storage().instance().set(&RequiredSignatures, &1u32);
-
+    token::Client::new(&env, &token_contract).decimals();
+    store_escrow_data(&env, &buyer, &seller, &arbiter, &token_contract, amount, deadline_ledger, 1u32);
     extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-
-    events::escrow_created(&env, &buyer, &seller, amount);
-    events::initialized(&env, &buyer, &seller, &arbiter, amount);
-
+    emit_init_events(&env, &buyer, &seller, &arbiter, amount);
     Ok(())
 }
 
@@ -73,37 +104,15 @@ pub fn initialize_with_arbiters(
     if env.storage().instance().has(&State) {
         return Err(EscrowError::AlreadyInitialized);
     }
-    if amount <= 0 {
-        return Err(EscrowError::InvalidAmount);
-    }
-    if arbiters.is_empty() || required_signatures == 0 || required_signatures > arbiters.len() as u32 {
-        return Err(EscrowError::InvalidParties);
-    }
-    for arbiter in arbiters.iter() {
-        if arbiter == buyer || arbiter == seller {
-            return Err(EscrowError::InvalidParties);
-        }
-    }
+    validate_amount(amount)?;
+    validate_parties_multi(&buyer, &seller, &arbiters, required_signatures)?;
     validate_deadline(&env, deadline_ledger).map_err(|_| EscrowError::DeadlinePassed)?;
-
-    let token_client = token::Client::new(&env, &token_contract);
-    token_client.decimals();
-
-    env.storage().instance().set(&Buyer, &buyer);
-    env.storage().instance().set(&Seller, &seller);
+    token::Client::new(&env, &token_contract).decimals();
+    let primary_arbiter = arbiters.get(0).unwrap();
+    store_escrow_data(&env, &buyer, &seller, &primary_arbiter, &token_contract, amount, deadline_ledger, required_signatures);
     env.storage().instance().set(&Arbiters, &arbiters);
-    env.storage().instance().set(&Arbiter, &arbiters.get(0).unwrap());
-    env.storage().instance().set(&RequiredSignatures, &required_signatures);
-    env.storage().instance().set(&TokenContract, &token_contract);
-    env.storage().instance().set(&Amount, &amount);
-    env.storage().instance().set(&Deadline, &deadline_ledger);
-    env.storage().instance().set(&State, &EscrowState::Created);
-
     extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-
-    events::escrow_created(&env, &buyer, &seller, amount);
-    events::initialized(&env, &buyer, &seller, &arbiters.get(0).unwrap(), amount);
-
+    emit_init_events(&env, &buyer, &seller, &primary_arbiter, amount);
     Ok(())
 }
 

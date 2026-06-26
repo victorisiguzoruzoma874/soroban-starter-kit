@@ -16,6 +16,7 @@ Each ADR documents a significant design decision: the context that motivated it,
 | [0006](0006-escrow-arbiter-model.md) | Escrow Arbiter Model | Accepted |
 | [0007](0007-token-interface-compliance.md) | Token Interface Compliance | Accepted |
 | [0009](0009-batch-mint-design.md) | Batch Mint Design — Atomicity & Cap Enforcement | Accepted |
+| [0008](0008-multisig-arbiter-design.md) | Multi-sig Arbiter Design | Accepted |
 
 ## Format
 

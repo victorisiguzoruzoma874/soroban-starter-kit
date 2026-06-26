@@ -29,13 +29,23 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run benchmarks (save baseline)
-        # --save-baseline stores results under target/criterion so we can
-        # compare on subsequent runs.  On PRs we compare against the stored
-        # main baseline; on pushes to main we update it.
+      - name: Install cargo-criterion
+        run: cargo install cargo-criterion --locked
+
+      - name: Run benchmarks with cargo-criterion
+        # cargo-criterion saves machine-readable JSON and HTML reports under
+        # target/criterion/. On PRs we compare against the stored main baseline;
+        # on pushes to main we update it.
         run: |
-          cargo bench --package contract-benchmarks -- \
-            --save-baseline ci_baseline 2>&1 | tee bench_output.txt
+          cargo criterion --package contract-benchmarks \
+            --message-format json 2>&1 | tee bench_output.txt
+
+      - name: Upload HTML benchmark reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-html-reports-${{ github.sha }}
+          path: target/criterion/
+          retention-days: 30
 
       - name: Parse benchmark results to JSON
         shell: bash
@@ -174,7 +184,7 @@ jobs:
             }
 
       # ── Threshold check ────────────────────────────────────────────────────
-      # Criterion prints "time: [lower  estimate  upper]" lines.
+      # cargo-criterion prints "time: [lower  estimate  upper]" lines.
       # The script below fails the job if any single operation exceeds the
       # defined nanosecond threshold.  Adjust thresholds as the contracts evolve.
       - name: Check gas regression thresholds

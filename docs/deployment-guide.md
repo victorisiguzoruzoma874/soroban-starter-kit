@@ -415,8 +415,85 @@ node scripts/generate-guides.mjs
 - Build contracts with `--release` flag (default in `deploy.sh`)
 - Minimize contract storage reads — cache values in `Env::storage().instance()`
 - Use `TTL` extensions for long-lived contract data to avoid expiry
-- Profile WASM size: `wasm-opt -Oz input.wasm -o output.wasm`
 - Frontend: set `Cache-Control: max-age=31536000` for hashed static assets
+
+### WASM Binary Size Optimisation with wasm-opt
+
+The build pipeline already sets `opt-level = "z"` and `lto = true` in the
+release profile. Running `wasm-opt -Oz` (from [Binaryen](https://github.com/WebAssembly/binaryen))
+as a post-build step typically reduces WASM size by an additional **10–30%**,
+lowering upload fees and ledger footprint.
+
+#### Install Binaryen
+
+```bash
+# macOS
+brew install binaryen
+
+# Ubuntu / Debian
+apt-get install binaryen
+
+# From source / pre-built release
+# https://github.com/WebAssembly/binaryen/releases
+```
+
+Verify the install:
+
+```bash
+wasm-opt --version
+```
+
+#### Run manually
+
+```bash
+# Optimise a single WASM file in-place
+wasm-opt -Oz --output optimized.wasm input.wasm
+
+# Check size reduction
+ls -lh input.wasm optimized.wasm
+```
+
+#### Automated via deploy.sh
+
+`scripts/deploy.sh` automatically runs `wasm-opt -Oz` on each compiled WASM
+after building, if `wasm-opt` is present on `$PATH`. It prints before/after
+sizes for every file:
+
+```
+── Building escrow ──
+  wasm-opt: 84320B → 61440B (-27%)
+── Deploying escrow to testnet ──
+```
+
+If `wasm-opt` is not installed, the script skips optimisation with an `INFO`
+message — the build still succeeds.
+
+#### Automated via Docker
+
+`docker/Dockerfile.contracts` installs `binaryen` in the build stage and runs
+`wasm-opt -Oz` on every WASM artifact before copying them to the runtime stage.
+Size comparisons are printed during the Docker build:
+
+```
+=== wasm-opt size reduction ===
+  soroban_escrow_template.wasm: 84320B → 61440B (-27%)
+  soroban_token_template.wasm:  72800B → 54200B (-25%)
+```
+
+#### CI size comparison
+
+To track WASM sizes across PRs, add a step to your CI workflow:
+
+```yaml
+- name: Report WASM sizes
+  run: |
+    echo "| Contract | Size |" >> $GITHUB_STEP_SUMMARY
+    echo "|----------|------|" >> $GITHUB_STEP_SUMMARY
+    find target/wasm32-unknown-unknown/release -maxdepth 1 -name "*.wasm" | sort | \
+      while read f; do
+        echo "| $(basename $f) | $(stat -c%s $f)B |" >> $GITHUB_STEP_SUMMARY
+      done
+```
 
 ---
 
