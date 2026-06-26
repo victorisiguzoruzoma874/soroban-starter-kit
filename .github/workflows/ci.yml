@@ -214,6 +214,15 @@ jobs:
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Run cargo audit
+        run: cargo audit --deny warnings
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install Rust
@@ -345,3 +354,29 @@ jobs:
       - name: Stop local Stellar node
         if: always()
         run: docker compose -f docker/docker-compose.yml down -v
+  nightly:
+    name: Nightly Build
+    runs-on: ubuntu-latest
+    schedule:
+      - cron: '0 0 * * 0' # Runs every Sunday at midnight
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+      - name: Compile all contracts
+        run: cargo build --workspace --all-targets
+      - name: Test all contracts
+        run: cargo test --workspace --all-targets
+      - name: Report failure
+        if: ${{ failure() }}
+        uses: actions/create-issue@v2
+        with:
+          title: "Nightly build failed"
+          body: "The nightly build failed. Please investigate."
+          labels: "bug"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
