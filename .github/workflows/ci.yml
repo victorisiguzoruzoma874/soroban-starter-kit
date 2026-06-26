@@ -118,6 +118,31 @@ jobs:
           path: lcov.info
           retention-days: 30
 
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [token_fuzz, escrow_initialize, token_mint_burn]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+        with:
+          toolchain: nightly
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Run fuzz target (10 000 iterations)
+        working-directory: fuzz
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -runs=10000 -max_total_time=120
+
   deny:
     name: License and Duplicate Check
     runs-on: ubuntu-latest
