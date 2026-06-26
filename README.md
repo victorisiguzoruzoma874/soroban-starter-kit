@@ -329,6 +329,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [Security Best Practices](docs/security.md)
 - [Token Interface Compliance ADR](docs/adr/0007-token-interface-compliance.md)
+- [Batch Mint Design ADR](docs/adr/0009-batch-mint-design.md)
 - [Architecture Decision Records](docs/adr/README.md)
 
 ## 📄 License
