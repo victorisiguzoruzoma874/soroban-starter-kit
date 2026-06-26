@@ -231,6 +231,29 @@ Start a local Stellar node with Soroban RPC:
 docker compose up stellar-node
 ```
 
+### Creating a New Contract
+
+Scaffold a fresh contract from the `contracts/common` skeleton with a single command:
+
+```bash
+./scripts/new-contract.sh <contract-name>
+```
+
+**Example** — create a `price-feed` contract:
+
+```bash
+./scripts/new-contract.sh price-feed
+```
+
+This creates `contracts/price-feed/` (with `Cargo.toml` and `src/lib.rs`) and registers it in the workspace. Verify it compiles and its test passes immediately:
+
+```bash
+cargo check -p soroban-price-feed
+cargo test  -p soroban-price-feed
+```
+
+Then replace the stub `hello()` method in `contracts/price-feed/src/lib.rs` with your contract logic.
+
 ## ⚠️ Error Reference
 
 > For full details — causes, triggers, and resolution steps — see [docs/error-reference.md](docs/error-reference.md).
