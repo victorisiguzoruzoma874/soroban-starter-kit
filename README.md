@@ -317,6 +317,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 
 ## 📚 Resources
 
+- [FAQ](docs/faq.md) — Common developer questions: setup, testing, deployment, feature flags, token customization
 - [System Architecture](docs/architecture.md) — High-level design, contract relationships, storage tiers, event model, and admin framework
 - [Security Best Practices](docs/security.md)
 - [Integration Guide](docs/integration-guide.md)
