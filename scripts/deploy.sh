@@ -15,6 +15,28 @@ check_prerequisites() {
 }
 check_prerequisites
 
+WASM_OPT_AVAILABLE=false
+if command -v wasm-opt &>/dev/null; then
+  WASM_OPT_AVAILABLE=true
+else
+  echo "INFO: wasm-opt not found — skipping WASM size optimisation." >&2
+  echo "      Install Binaryen (https://github.com/WebAssembly/binaryen) to enable." >&2
+fi
+
+optimize_wasm() {
+  local wasm="$1"
+  if [[ "$WASM_OPT_AVAILABLE" == "false" ]]; then
+    return
+  fi
+  local before
+  before=$(stat -c%s "$wasm" 2>/dev/null || stat -f%z "$wasm")
+  wasm-opt -Oz --output "${wasm}.opt" "$wasm" && mv "${wasm}.opt" "$wasm"
+  local after
+  after=$(stat -c%s "$wasm" 2>/dev/null || stat -f%z "$wasm")
+  local pct=$(( (before - after) * 100 / before ))
+  echo "  wasm-opt: ${before}B → ${after}B (-${pct}%)"
+}
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTRACTS_DIR="$ROOT/contracts"
 
@@ -78,6 +100,8 @@ deploy_contract() {
 
   WASM=$(find "$dir/target/wasm32-unknown-unknown/release" -name "*.wasm" | head -1)
   [[ -n "$WASM" ]] || { echo "No WASM found for $name"; return 1; }
+
+  optimize_wasm "$WASM"
 
   echo "── Deploying $name to $NETWORK ──"
   CONTRACT_ID=$(stellar contract deploy \

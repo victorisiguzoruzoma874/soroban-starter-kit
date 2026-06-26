@@ -172,6 +172,58 @@ rustup target add wasm32-unknown-unknown
 
 ---
 
+## Benchmarks with cargo-criterion
+
+The project uses [cargo-criterion](https://github.com/bheisler/cargo-criterion) for
+benchmarking. It wraps the standard `criterion` crate and adds:
+
+- **Machine-readable JSON output** for CI regression comparison
+- **HTML reports** with charts saved under `target/criterion/`
+- Cleaner CLI output with per-benchmark statistics
+
+### Installing cargo-criterion
+
+```bash
+cargo install cargo-criterion --locked
+```
+
+### Running benchmarks locally
+
+```bash
+# Run all benchmarks and generate HTML reports
+cargo criterion --package contract-benchmarks
+
+# Run a single benchmark group
+cargo criterion --package contract-benchmarks --bench escrow_ops
+
+# Open the HTML report in your browser (macOS)
+open target/criterion/report/index.html
+
+# Linux
+xdg-open target/criterion/report/index.html
+```
+
+### Comparing against a baseline
+
+```bash
+# Save a baseline before your change
+cargo criterion --package contract-benchmarks -- --save-baseline before
+
+# Make your change, then compare
+cargo criterion --package contract-benchmarks -- --baseline before
+```
+
+### CI integration
+
+The `.github/workflows/bench.yml` workflow:
+1. Runs `cargo criterion` on every push and PR
+2. Uploads HTML reports as a GitHub Actions artifact (`criterion-html-reports-<sha>`)
+3. Compares results against the stored `main` baseline and fails if any
+   benchmark regresses by more than 10%
+4. Posts a markdown regression table as a PR comment
+
+---
+
 ## Fuzz Testing
 
 Fuzz testing helps discover edge cases and potential vulnerabilities in contract code.

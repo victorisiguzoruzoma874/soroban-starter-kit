@@ -2,7 +2,7 @@
 FROM rust:1.78-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev \
+    pkg-config libssl-dev binaryen \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo install --locked stellar-cli --features opt
@@ -12,6 +12,17 @@ COPY soroban-starter-kit/ .
 
 RUN for dir in contracts/*/; do \
       [ -f "$dir/Cargo.toml" ] && stellar contract build --manifest-path "$dir/Cargo.toml"; \
+    done
+
+# Run wasm-opt -Oz on every compiled WASM to reduce binary size by 10–30%.
+# Prints before/after sizes for each file.
+RUN echo "=== wasm-opt size reduction ===" && \
+    find target/wasm32-unknown-unknown/release -maxdepth 1 -name "*.wasm" | sort | while read wasm; do \
+      before=$(stat -c%s "$wasm"); \
+      wasm-opt -Oz --output "${wasm}.opt" "$wasm" && mv "${wasm}.opt" "$wasm"; \
+      after=$(stat -c%s "$wasm"); \
+      pct=$(( (before - after) * 100 / before )); \
+      echo "  $(basename $wasm): ${before}B → ${after}B (-${pct}%)"; \
     done
 
 # Stage 2: runtime — only .wasm artifacts
