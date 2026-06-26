@@ -165,6 +165,28 @@ Each template includes:
 
 > **Zero-install option:** Open this repo in a pre-configured environment with all tools ready — see the [Dev Container & Codespaces Guide](docs/devcontainer.md).
 
+## 🔄 Compatibility Matrix
+
+This repository is pinned to `soroban-sdk = "=21.7.7"`. Each major SDK version is tightly coupled to a Stellar network protocol version. Use the table below to pick the right SDK for your target network.
+
+> ⚠️ **Always verify compatibility before deploying to Mainnet.** Contracts compiled against SDK v21 will not work on a node running Protocol 22 or later without recompilation against the matching SDK version.
+
+| soroban-sdk version | Stellar Protocol | Network status | Notes |
+|---------------------|-----------------|----------------|-------|
+| `21.x` (this repo: `21.7.7`) | Protocol 21 | Mainnet (Jun 2024) | secp256r1, separate TTL extension for instance/code |
+| `22.x` | Protocol 22 | Mainnet (Dec 2024) | Constructor support, BLS12-381 host functions |
+| `23.x` | Protocol 23 "Whisk" | Mainnet (Sep 2025) | Unified events (CAP-67), state archival (CAP-62/66) |
+| `25.x` | Protocol 25 "X-Ray" | Mainnet (Jan 2026) | BN254 elliptic curve ops, Poseidon hash functions |
+| `26.x` | Protocol 26 "Yardstick" | Mainnet (May 2026) | Freeze ledger entries, muxed address conversions, ZK BN254 |
+
+**To upgrade this repository to a newer SDK:**
+1. Update `soroban-sdk = "=<new-version>"` in `Cargo.toml`.
+2. Update `stellar-cli` to the matching version (`cargo install stellar-cli --version <new-version>`).
+3. Rebuild all contracts and run the full test suite.
+4. Update this matrix and `docs/gas-costs.md` with the new protocol version and fee schedule.
+
+For the authoritative version table, see [Stellar Software Versions](https://developers.stellar.org/docs/networks/software-versions).
+
 ## 📖 Usage
 
 ### Building Contracts
