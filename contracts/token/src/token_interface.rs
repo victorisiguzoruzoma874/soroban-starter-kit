@@ -11,8 +11,6 @@ use crate::events;
 use crate::storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
 use crate::TokenContract;
 use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
-use crate::storage::{DataKey, MetadataKey};
-use crate::{bump_instance, TokenContract};
 
 #[cfg(feature = "pausable")]
 use crate::require_not_paused;

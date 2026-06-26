@@ -74,6 +74,23 @@ jobs:
       - name: Run tests
         run: cargo test -p ${{ matrix.contract }}
 
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run integration tests
+        run: cargo test -p soroban-integration-tests
+
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
@@ -94,15 +111,82 @@ jobs:
       - name: Generate coverage
         run: cargo llvm-cov --workspace --lcov --output-path lcov.info
 
-      - name: Check coverage threshold
+      - name: Generate coverage summary
+        id: coverage
         run: |
           COVERAGE=$(cargo llvm-cov --workspace --json | jq '.data[0].summary.percent_covered')
+          echo "percent=${COVERAGE}" >> "$GITHUB_OUTPUT"
+          echo "Code coverage: ${COVERAGE}%"
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE="${{ steps.coverage.outputs.percent }}"
           THRESHOLD=80
           echo "Code coverage: ${COVERAGE}%"
           if (( $(echo "$COVERAGE < $THRESHOLD" | bc -l) )); then
             echo "ERROR: Coverage ${COVERAGE}% is below threshold ${THRESHOLD}%"
             exit 1
           fi
+
+      - name: Compute base branch coverage delta
+        if: github.event_name == 'pull_request'
+        id: base_coverage
+        continue-on-error: true
+        run: |
+          git fetch origin "${{ github.base_ref }}"
+          git checkout "origin/${{ github.base_ref }}"
+          BASE=$(cargo llvm-cov --workspace --json | jq '.data[0].summary.percent_covered')
+          echo "percent=${BASE}" >> "$GITHUB_OUTPUT"
+          git checkout "${{ github.sha }}"
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const current = parseFloat('${{ steps.coverage.outputs.percent }}');
+            const baseRaw = '${{ steps.base_coverage.outputs.percent }}';
+            const base = baseRaw ? parseFloat(baseRaw) : null;
+            const delta = base !== null ? (current - base).toFixed(2) : null;
+            const deltaStr = delta !== null
+              ? (parseFloat(delta) >= 0 ? `+${delta}` : delta)
+              : 'n/a';
+            const threshold = 80;
+            const status = current >= threshold ? '✅' : '❌';
+            const body = [
+              '## Code Coverage Report',
+              '',
+              `| Metric | Value |`,
+              `|--------|-------|`,
+              `| Line coverage | **${current.toFixed(2)}%** ${status} |`,
+              `| Threshold | ${threshold}% |`,
+              `| Delta vs \`${{ github.base_ref }}\` | ${deltaStr}% |`,
+              '',
+              `Minimum line coverage of ${threshold}% is ${current >= threshold ? 'met' : '**not met**'}.`,
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = '<!-- coverage-report -->';
+            const existing = comments.find(c => c.body.includes(marker));
+            const fullBody = `${marker}\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: fullBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: fullBody,
+              });
+            }
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3
@@ -116,6 +200,57 @@ jobs:
         with:
           name: coverage-report
           path: lcov.info
+          retention-days: 30
+
+  mutation-testing:
+    name: Mutation Testing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-mutants
+        run: cargo install cargo-mutants --locked
+
+      - name: Run mutation tests on token and escrow
+        run: |
+          cargo mutants --config mutants.toml --baseline skip --no-times --no-shuffle \
+            -p soroban-token-template -p soroban-escrow-template \
+            -o mutants.out
+          if [ -f mutants.out/outcomes.json ]; then
+            OUTCOMES=mutants.out/outcomes.json
+          elif [ -f mutants.out/mutants.out/outcomes.json ]; then
+            OUTCOMES=mutants.out/mutants.out/outcomes.json
+          elif [ -f mutants.out/outcomes.jsonl ]; then
+            OUTCOMES=mutants.out/outcomes.jsonl
+          else
+            OUTCOMES=mutants.out/mutants.out/outcomes.jsonl
+          fi
+          if [[ "$OUTCOMES" == *.jsonl ]]; then
+            SURVIVORS=$(grep -c '"status": "missed"' "$OUTCOMES" 2>/dev/null || echo 0)
+          else
+            SURVIVORS=$(jq '[.outcomes[]? // .[]? | select(.status == "missed")] | length' "$OUTCOMES")
+          fi
+          echo "Surviving mutants: ${SURVIVORS}"
+          if [ "$SURVIVORS" -gt 0 ]; then
+            echo "ERROR: ${SURVIVORS} surviving mutant(s) in critical paths"
+            cat mutants.out/outcomes.jsonl 2>/dev/null | jq 'select(.status == "missed")' || true
+            exit 1
+          fi
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: mutants.out/
           retention-days: 30
 
   deny:

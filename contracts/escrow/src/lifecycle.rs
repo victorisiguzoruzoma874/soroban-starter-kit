@@ -83,7 +83,7 @@ pub fn initialize(
     }
     validate_amount(amount)?;
     validate_parties(&buyer, &seller, &arbiter)?;
-    validate_deadline(&env, deadline_ledger).map_err(|_| EscrowError::DeadlinePassed)?;
+    validate_deadline::<EscrowError>(&env, deadline_ledger)?;
     token::Client::new(&env, &token_contract).decimals();
     store_escrow_data(&env, &buyer, &seller, &arbiter, &token_contract, amount, deadline_ledger, 1u32);
     extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
@@ -106,7 +106,7 @@ pub fn initialize_with_arbiters(
     }
     validate_amount(amount)?;
     validate_parties_multi(&buyer, &seller, &arbiters, required_signatures)?;
-    validate_deadline(&env, deadline_ledger).map_err(|_| EscrowError::DeadlinePassed)?;
+    validate_deadline::<EscrowError>(&env, deadline_ledger)?;
     token::Client::new(&env, &token_contract).decimals();
     let primary_arbiter = arbiters.get(0).unwrap();
     store_escrow_data(&env, &buyer, &seller, &primary_arbiter, &token_contract, amount, deadline_ledger, required_signatures);
