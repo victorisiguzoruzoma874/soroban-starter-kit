@@ -1,0 +1,25 @@
+use soroban_sdk::{Address, Env, Symbol};
+
+pub fn initialized(env: &Env, admin: &Address, ticket_price: i128) {
+    env.events().publish(
+        (Symbol::new(env, "initialized"), admin.clone()),
+        ticket_price,
+    );
+}
+
+pub fn ticket_purchased(env: &Env, buyer: &Address) {
+    env.events()
+        .publish((Symbol::new(env, "ticket_purchased"), buyer.clone()), ());
+}
+
+pub fn committed(env: &Env, admin: &Address) {
+    env.events()
+        .publish((Symbol::new(env, "committed"), admin.clone()), ());
+}
+
+pub fn winner_drawn(env: &Env, winner: &Address, prize: i128) {
+    env.events().publish(
+        (Symbol::new(env, "winner_drawn"), winner.clone()),
+        prize,
+    );
+}

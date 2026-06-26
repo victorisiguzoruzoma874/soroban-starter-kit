@@ -91,6 +91,24 @@ proptest! {
 
 **Use `prop_assert!` / `prop_assert_eq!`** instead of `assert!` inside `proptest!` blocks — they report the failing input rather than just panicking.
 
+### Proptest configuration
+
+The root `proptest.toml` configures proptest for all contracts in this workspace:
+
+```toml
+[proptest]
+cases = 256
+failure_persistence = "MapPath"
+```
+
+`failure_persistence = "MapPath"` tells proptest to write failing seeds to `proptest-regressions/<module_path>.txt` next to the test source. These files are listed in `.gitignore` so they are not committed — see the note below on how to share a failing seed.
+
+Override the number of cases for a single run:
+
+```bash
+PROPTEST_CASES=10000 cargo test -p soroban-token-template prop_
+```
+
 ### Reproducing a Failing Seed
 
 When proptest finds a failure it prints a line like:
@@ -101,21 +119,16 @@ PROPTEST_REGRESSIONS=contracts/token/proptest-regressions/prop_test.txt
 Failing input: amount = 9223372036854775807
 ```
 
-To reproduce it deterministically:
+The seed is saved to `proptest-regressions/prop_test.txt` inside the contract directory. To reproduce deterministically:
 
 ```bash
-# Re-run only that test with the saved seed file
-PROPTEST_REGRESSIONS=contracts/token/proptest-regressions/prop_test.txt \
-  cargo test -p soroban-token-template prop_mint_burn_roundtrip
+# Re-run only that test — proptest reads the saved regression file automatically
+cargo test -p soroban-token-template prop_mint_burn_roundtrip
 ```
 
-Proptest also writes a `proptest-regressions/` file next to the test file. Commit this file so CI always replays known failures.
+To share a failing seed with a colleague or in a bug report, copy the content of the regression file and paste it. They can place it at the same path and run the same command.
 
-To run more cases than the default (256):
-
-```bash
-PROPTEST_CASES=10000 cargo test -p soroban-token-template prop_
-```
+> **Gitignore choice:** `proptest-regressions/` directories are listed in `.gitignore` and are **not committed**. This keeps the repository clean. If you want CI to always replay a specific known failure, copy the regression file into a test fixture and add a dedicated `#[test]` that runs proptest with that seed using `ProptestConfig::with_cases(1)` and the `Just` strategy.
 
 ---
 

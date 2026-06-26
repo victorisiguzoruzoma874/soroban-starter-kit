@@ -7,21 +7,21 @@ pub fn initialized(env: &Env, threshold: u32, signer_count: u32) {
 
 pub fn signer_added(env: &Env, signer: &Address, threshold: u32) {
     env.events().publish(
-        (Symbol::new(env, "signer_added"), signer.clone()),
+        (Symbol::new(env, "added"), signer.clone()),
         threshold,
     );
 }
 
 pub fn signer_removed(env: &Env, signer: &Address, threshold: u32) {
     env.events().publish(
-        (Symbol::new(env, "signer_removed"), signer.clone()),
+        (Symbol::new(env, "removed"), signer.clone()),
         threshold,
     );
 }
 
 pub fn transaction_proposed(env: &Env, tx_id: u64, proposer: &Address) {
     env.events().publish(
-        (Symbol::new(env, "transaction_proposed"), proposer.clone()),
+        (Symbol::new(env, "proposed"), proposer.clone()),
         tx_id,
     );
 }
@@ -29,7 +29,7 @@ pub fn transaction_proposed(env: &Env, tx_id: u64, proposer: &Address) {
 pub fn transaction_signed(env: &Env, tx_id: u64, signer: &Address, signature_count: u32) {
     env.events().publish(
         (
-            Symbol::new(env, "transaction_signed"),
+            Symbol::new(env, "signed"),
             signer.clone(),
             tx_id,
         ),
@@ -39,5 +39,5 @@ pub fn transaction_signed(env: &Env, tx_id: u64, signer: &Address, signature_cou
 
 pub fn transaction_executed(env: &Env, tx_id: u64) {
     env.events()
-        .publish((Symbol::new(env, "transaction_executed"), tx_id), ());
+        .publish((Symbol::new(env, "executed"), tx_id), ());
 }

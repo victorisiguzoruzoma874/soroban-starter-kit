@@ -23,14 +23,14 @@ pub fn unstaked(env: &Env, staker: &Address, amount: i128, remaining: i128) {
 
 pub fn rewards_claimed(env: &Env, staker: &Address, amount: i128) {
     env.events().publish(
-        (Symbol::new(env, "rewards_claimed"), staker.clone()),
+        (Symbol::new(env, "claimed_rewards"), staker.clone()),
         amount,
     );
 }
 
 pub fn rewards_added(env: &Env, admin: &Address, amount: i128, new_total: i128) {
     env.events().publish(
-        (Symbol::new(env, "rewards_added"), admin.clone()),
+        (Symbol::new(env, "added_rewards"), admin.clone()),
         (amount, new_total),
     );
 }

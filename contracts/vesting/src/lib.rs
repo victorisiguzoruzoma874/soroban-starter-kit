@@ -102,13 +102,13 @@ impl VestingContract {
             return Err(VestingError::NotInitialized);
         }
 
-        let beneficiary: Address = env.storage().instance().get(&DataKey::Beneficiary).unwrap();
+        let beneficiary: Address = env.storage().instance().get(&DataKey::Beneficiary).ok_or(VestingError::NotInitialized)?;
         beneficiary.require_auth();
 
-        let amount: i128 = env.storage().instance().get(&DataKey::Amount).unwrap();
-        let cliff_ledger: u32 = env.storage().instance().get(&DataKey::CliffLedger).unwrap();
-        let end_ledger: u32 = env.storage().instance().get(&DataKey::EndLedger).unwrap();
-        let claimed: i128 = env.storage().instance().get(&DataKey::Claimed).unwrap();
+        let amount: i128 = env.storage().instance().get(&DataKey::Amount).ok_or(VestingError::NotInitialized)?;
+        let cliff_ledger: u32 = env.storage().instance().get(&DataKey::CliffLedger).ok_or(VestingError::NotInitialized)?;
+        let end_ledger: u32 = env.storage().instance().get(&DataKey::EndLedger).ok_or(VestingError::NotInitialized)?;
+        let claimed: i128 = env.storage().instance().get(&DataKey::Claimed).ok_or(VestingError::NotInitialized)?;
         let revoked: bool = env.storage().instance().get(&DataKey::Revoked).unwrap_or(false);
 
         // After revoke, `amount` is already capped to what was vested at revoke time.
@@ -126,7 +126,7 @@ impl VestingContract {
 
         env.storage().instance().set(&DataKey::Claimed, &(claimed + claimable));
 
-        let token: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        let token: Address = env.storage().instance().get(&DataKey::Token).ok_or(VestingError::NotInitialized)?;
         token::Client::new(&env, &token).transfer(
             &env.current_contract_address(),
             &beneficiary,
@@ -156,13 +156,13 @@ impl VestingContract {
             return Err(VestingError::AlreadyRevoked);
         }
 
-        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).ok_or(VestingError::NotInitialized)?;
         admin.require_auth();
 
-        let amount: i128 = env.storage().instance().get(&DataKey::Amount).unwrap();
-        let cliff_ledger: u32 = env.storage().instance().get(&DataKey::CliffLedger).unwrap();
-        let end_ledger: u32 = env.storage().instance().get(&DataKey::EndLedger).unwrap();
-        let claimed: i128 = env.storage().instance().get(&DataKey::Claimed).unwrap();
+        let amount: i128 = env.storage().instance().get(&DataKey::Amount).ok_or(VestingError::NotInitialized)?;
+        let cliff_ledger: u32 = env.storage().instance().get(&DataKey::CliffLedger).ok_or(VestingError::NotInitialized)?;
+        let end_ledger: u32 = env.storage().instance().get(&DataKey::EndLedger).ok_or(VestingError::NotInitialized)?;
+        let claimed: i128 = env.storage().instance().get(&DataKey::Claimed).ok_or(VestingError::NotInitialized)?;
 
         let vested = vested_amount(amount, cliff_ledger, end_ledger, env.ledger().sequence());
         // Tokens vested but not yet claimed stay in the contract for the beneficiary.
@@ -175,7 +175,7 @@ impl VestingContract {
         // Claimed stays the same; beneficiary can still claim (vested - claimed).
         let _ = claimed; // already stored, no change needed
 
-        let token: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        let token: Address = env.storage().instance().get(&DataKey::Token).ok_or(VestingError::NotInitialized)?;
         if returnable > 0 {
             token::Client::new(&env, &token).transfer(
                 &env.current_contract_address(),
@@ -196,12 +196,12 @@ impl VestingContract {
         }
         bump(&env);
         Some(VestingInfo {
-            beneficiary: env.storage().instance().get(&DataKey::Beneficiary).unwrap(),
-            token: env.storage().instance().get(&DataKey::Token).unwrap(),
-            cliff_ledger: env.storage().instance().get(&DataKey::CliffLedger).unwrap(),
-            end_ledger: env.storage().instance().get(&DataKey::EndLedger).unwrap(),
-            amount: env.storage().instance().get(&DataKey::Amount).unwrap(),
-            claimed: env.storage().instance().get(&DataKey::Claimed).unwrap(),
+            beneficiary: env.storage().instance().get(&DataKey::Beneficiary).ok_or(VestingError::NotInitialized).ok()?,
+            token: env.storage().instance().get(&DataKey::Token).ok_or(VestingError::NotInitialized).ok()?,
+            cliff_ledger: env.storage().instance().get(&DataKey::CliffLedger).ok_or(VestingError::NotInitialized).ok()?,
+            end_ledger: env.storage().instance().get(&DataKey::EndLedger).ok_or(VestingError::NotInitialized).ok()?,
+            amount: env.storage().instance().get(&DataKey::Amount).ok_or(VestingError::NotInitialized).ok()?,
+            claimed: env.storage().instance().get(&DataKey::Claimed).ok_or(VestingError::NotInitialized).ok()?,
             revoked: env.storage().instance().get(&DataKey::Revoked).unwrap_or(false),
         })
     }
@@ -211,10 +211,10 @@ impl VestingContract {
         if !env.storage().instance().has(&DataKey::Admin) {
             return 0;
         }
-        let amount: i128 = env.storage().instance().get(&DataKey::Amount).unwrap();
-        let cliff_ledger: u32 = env.storage().instance().get(&DataKey::CliffLedger).unwrap();
-        let end_ledger: u32 = env.storage().instance().get(&DataKey::EndLedger).unwrap();
-        let claimed: i128 = env.storage().instance().get(&DataKey::Claimed).unwrap();
+        let amount: i128 = env.storage().instance().get(&DataKey::Amount).ok_or(VestingError::NotInitialized).unwrap_or(0);
+        let cliff_ledger: u32 = env.storage().instance().get(&DataKey::CliffLedger).ok_or(VestingError::NotInitialized).unwrap_or(0);
+        let end_ledger: u32 = env.storage().instance().get(&DataKey::EndLedger).ok_or(VestingError::NotInitialized).unwrap_or(0);
+        let claimed: i128 = env.storage().instance().get(&DataKey::Claimed).ok_or(VestingError::NotInitialized).unwrap_or(0);
         let revoked: bool = env.storage().instance().get(&DataKey::Revoked).unwrap_or(false);
         // After revoke, amount is already capped to what was vested at revoke time.
         let vested = if revoked {

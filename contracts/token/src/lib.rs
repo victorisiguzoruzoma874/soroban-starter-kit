@@ -123,9 +123,10 @@ impl TokenContract {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = supply.checked_add(amount).ok_or(TokenError::Overflow)?;
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply + amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::minted(&env, &to, amount);
         Ok(())
@@ -186,9 +187,10 @@ impl TokenContract {
             .instance()
             .get(&DataKey::TotalSupply)
             .unwrap_or(0);
+        let new_supply = supply.checked_add(total_amount).ok_or(TokenError::Overflow)?;
         env.storage()
             .instance()
-            .set(&DataKey::TotalSupply, &(supply + total_amount));
+            .set(&DataKey::TotalSupply, &new_supply);
         extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 
         Ok(())
@@ -403,9 +405,10 @@ impl TokenContract {
             .instance()
             .get(&DataKey::Version)
             .unwrap_or(0);
+        let new_version = current_version.checked_add(1).ok_or(TokenError::Overflow)?;
         env.storage()
             .instance()
-            .set(&DataKey::Version, &(current_version + 1));
+            .set(&DataKey::Version, &new_version);
         extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
         events::upgraded(&env, &admin, &wasm_hash);
         env.events().publish(
