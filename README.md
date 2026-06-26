@@ -5,6 +5,8 @@
 
 A curated collection of production-ready Soroban smart contract templates. These templates help developers quickly bootstrap common use cases on Soroban (Stellar's smart contract platform) for DeFi, payments, governance, and more.
 
+**También disponible en**: [Español 🇪🇸](README.es.md)
+
 ## 🚀 Quick Start
 
 ```bash
