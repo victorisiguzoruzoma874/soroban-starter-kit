@@ -3,8 +3,8 @@
 use proptest::prelude::*;
 use soroban_sdk::{testutils::Ledger as _, Env};
 
-use crate::{VestingContract, VestingContractClient};
 use super::{make_token, setup_env};
+use crate::{vested_amount, VestingContract, VestingContractClient};
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::Address;
 
@@ -21,6 +21,61 @@ fn prop_setup(env: &Env, amount: i128) -> (VestingContractClient, Address, Addre
 }
 
 proptest! {
+    #[test]
+    fn prop_vested_amount_matches_schedule_checkpoints(
+        amount in 1i128..=1_000_000_000i128,
+        cliff_offset in 1u32..=10_000u32,
+        duration in 1u32..=100_000u32,
+        checkpoint_pct in 0u32..=100u32,
+    ) {
+        let env = setup_env();
+        let start = env.ledger().sequence();
+        let cliff = start + cliff_offset;
+        let end = cliff + duration;
+        let checkpoint = cliff + duration * checkpoint_pct / 100;
+        let expected = if checkpoint < cliff {
+            0
+        } else if checkpoint >= end {
+            amount
+        } else {
+            amount * i128::from(checkpoint - cliff) / i128::from(duration)
+        };
+
+        prop_assert_eq!(vested_amount(amount, cliff, end, checkpoint), expected);
+    }
+
+    #[test]
+    fn prop_vesting_claimable_matches_exact_release_formula(
+        amount in 1i128..=1_000_000_000i128,
+        cliff_offset in 1u32..=10_000u32,
+        duration in 1u32..=100_000u32,
+        checkpoint_pct in 0u32..=100u32,
+    ) {
+        let env = setup_env();
+        let admin = Address::generate(&env);
+        let beneficiary = Address::generate(&env);
+        let token = make_token(&env, &admin, amount);
+        let cliff = env.ledger().sequence() + cliff_offset;
+        let end = cliff + duration;
+        let addr = env.register_contract(None, VestingContract);
+        let client = VestingContractClient::new(&env, &addr);
+        client.initialize(&admin, &beneficiary, &token, &cliff, &end, &amount);
+
+        let before_cliff = cliff - 1;
+        env.ledger().with_mut(|l| l.sequence_number = before_cliff);
+        prop_assert_eq!(client.claimable(), 0);
+
+        let partial_checkpoint = cliff + duration * checkpoint_pct / 100;
+        env.ledger().with_mut(|l| l.sequence_number = partial_checkpoint);
+        prop_assert_eq!(
+            client.claimable(),
+            vested_amount(amount, cliff, end, partial_checkpoint)
+        );
+
+        env.ledger().with_mut(|l| l.sequence_number = end);
+        prop_assert_eq!(client.claimable(), amount);
+    }
+
     #[test]
     fn prop_initialize_stores_amount(amount in 1i128..=1_000_000i128) {
         let env = setup_env();
