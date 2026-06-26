@@ -1424,6 +1424,7 @@ dependencies = [
 
 [[package]]
 name = "soroban-marketplace-template"
+name = "soroban-lottery-template"
 version = "0.1.0"
 dependencies = [
  "soroban-common",
@@ -1444,6 +1445,14 @@ name = "soroban-nft-template"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "soroban-oracle-template"
+version = "0.1.0"
+dependencies = [
  "soroban-common",
  "soroban-sdk",
 ]
