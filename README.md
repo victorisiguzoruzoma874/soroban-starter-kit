@@ -167,6 +167,17 @@ Each template includes:
 
 > **Zero-install option:** Open this repo in a pre-configured environment with all tools ready — see the [Dev Container & Codespaces Guide](docs/devcontainer.md).
 
+### VS Code Setup
+
+A [.vscode/extensions.json](.vscode/extensions.json) file is included with recommended extensions for a consistent developer experience. VS Code will prompt you to install them when you open the project, or you can install them manually:
+
+| Extension | Purpose |
+|-----------|---------|
+| `rust-lang.rust-analyzer` | Rust language server (completions, go-to-def, inline errors) |
+| `tamasfe.even-better-toml` | Syntax highlighting and validation for `Cargo.toml` |
+| `serayuzgur.crates` | Inline crate version hints and outdated-dependency warnings |
+| `usernamehw.errorlens` | Inline diagnostic messages directly in the editor |
+
 ## 🔄 Compatibility Matrix
 
 This repository is pinned to `soroban-sdk = "=21.7.7"`. Each major SDK version is tightly coupled to a Stellar network protocol version. Use the table below to pick the right SDK for your target network.
