@@ -1,0 +1,63 @@
+name: Stale Issue/PR Management
+
+on:
+  schedule:
+    # Run at 2 AM UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # Issue configuration
+          days-before-issue-stale: 45
+          days-before-issue-close: 60
+          stale-issue-label: 'stale'
+          close-issue-label: 'closed-stale'
+          stale-issue-message: |
+            This issue has been inactive for 45 days. It will be closed in 15 days if no activity occurs.
+            
+            To keep it open:
+            - Comment with a status update or new information
+            - Link a PR that addresses this issue
+            - React to show continued interest
+            
+            Exempt labels (will not be marked stale): `Stellar Wave`, `pinned`, `security`
+          close-issue-message: 'Closed due to inactivity. Feel free to reopen if you\'d like to continue discussion.'
+          
+          # PR configuration
+          days-before-pr-stale: 45
+          days-before-pr-close: 60
+          stale-pr-label: 'stale'
+          close-pr-label: 'closed-stale'
+          stale-pr-message: |
+            This PR has been inactive for 45 days. It will be closed in 15 days if no activity occurs.
+            
+            To keep it open:
+            - Push new commits with updates
+            - Request re-review if changes are complete
+            - Comment with a status update
+            
+            Exempt labels (will not be marked stale): `Stellar Wave`, `pinned`, `do-not-close`
+          close-pr-message: 'Closed due to inactivity. Feel free to reopen if you\'d like to continue work on this PR.'
+          
+          # Common configuration
+          exempt-issue-labels: 'Stellar Wave,pinned,security,work-in-progress'
+          exempt-pr-labels: 'Stellar Wave,pinned,do-not-close,work-in-progress'
+          
+          # Don't mark as stale if assigned
+          exempt-all-assignees: false
+          
+          # Remove stale label when activity resumes
+          remove-stale-when-updated: true
+          
+          # Automation
+          operations-per-run: 30
+          delete-branch: false
