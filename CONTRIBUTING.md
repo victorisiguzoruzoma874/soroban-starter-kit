@@ -346,6 +346,39 @@ The format is `type(scope): subject`, where `type` is one of: `feat`, `fix`, `do
 
 ---
 
+## Branch Protection Rules
+
+The `main` branch is protected with the following rules:
+
+| Rule | Enforcement |
+|------|------------|
+| Require PR reviews | Minimum **1 approval** required before merge |
+| Require status checks | All GitHub Actions workflows must pass: `ci`, `lint-pr-title`, `bench`, `pr-labeler` |
+| Require branches up to date | Branch must be up-to-date with `main` before merge |
+| Restrict who can push | Only authorized maintainers can merge PRs |
+| Allow force pushes | Disabled — prevents accidental history rewriting |
+| Allow deletions | Disabled — protects branch from accidents |
+| Require code owner review | Enabled — CODEOWNERS file is enforced |
+
+### Status Checks Required for Merge
+
+All of the following must pass **before review begins**:
+
+1. **`ci`** — Runs `cargo test --workspace`, `cargo clippy`, `cargo fmt --check`, `cargo machete`, and WASM size verification
+2. **`lint-pr-title`** — Validates PR title follows Conventional Commits format
+3. **`bench`** — Gas/time benchmarks for escrow and token operations (informational)
+4. **`pr-labeler`** — Auto-applies labels based on file changes (informational)
+
+### What Contributors Must Know
+
+- **Never force-push** to `main` or any branch with a PR open
+- **Wait for 1 approval** from a maintainer before merging (maintainers merge, not authors)
+- **Keep your branch up to date** — GitHub will prevent merge if `main` has new commits
+- **Rebase or merge** to sync with main before requesting final review
+- **CI failures block review** — fix all failed checks first, then re-request review
+
+---
+
 ## PR Review Process
 
 1. A maintainer will be assigned to review within **3 business days** of opening.
