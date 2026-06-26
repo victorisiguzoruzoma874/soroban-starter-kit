@@ -1,23 +1,26 @@
 [workspace]
 members = [
+  "benches",
   "contracts/common",
   "contracts/token",
   "contracts/escrow",
   "contracts/vesting",
   "contracts/staking",
   "contracts/multisig",
+  "contracts/subscription",
   "contracts/timelock",
   "contracts/nft",
   "contracts/dao",
   "contracts/swap",
   "contracts/crowdfund",
   "contracts/auction",
+  "contracts/marketplace",
+  "contracts/airdrop",
+  "contracts/oracle",
+  "contracts/lottery",
   "tests",
   "fuzz",
 ]
-members = ["contracts/common", "contracts/token", "contracts/escrow", "contracts/vesting", "contracts/staking", "contracts/multisig", "contracts/subscription", "contracts/timelock", "contracts/nft", "contracts/dao", "contracts/swap", "contracts/marketplace", "contracts/airdrop", "tests", "fuzz"]
-members = ["contracts/common", "contracts/token", "contracts/escrow", "contracts/vesting", "contracts/staking", "contracts/multisig", "contracts/subscription", "contracts/timelock", "contracts/nft", "contracts/dao", "contracts/swap", "tests", "fuzz"]
-members = ["contracts/common", "contracts/token", "contracts/escrow", "contracts/vesting", "contracts/staking", "contracts/multisig", "contracts/subscription", "contracts/timelock", "contracts/nft", "contracts/dao", "contracts/swap", "contracts/oracle", "contracts/lottery", "tests", "fuzz"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -28,6 +31,7 @@ proc-macro2 = "=1.0.106"
 quote = "=1.0.45"
 soroban-sdk-testutils = { version = "=21.7.7", package = "soroban-sdk", features = ["testutils"] }
 proptest = "=1.6.0"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [profile.release]
 opt-level = "z"

@@ -80,6 +80,73 @@ cargo semver-checks -p soroban-escrow-template
 - Confirm that Protocol 22 fee schedule values are still correct and update any
   stale network fee assumptions.
 
+## Upgrading soroban-sdk
+
+The SDK version is pinned with an exact constraint (`=21.7.7`) in
+`[workspace.dependencies]` in the root `Cargo.toml` to guarantee reproducible
+builds across all developers and CI.
+
+### Finding the latest stable release
+
+```bash
+cargo search soroban-sdk | head -5
+# or browse https://crates.io/crates/soroban-sdk/versions
+```
+
+Check the [Stellar Protocol changelog](https://github.com/stellar/stellar-protocol)
+for protocol-breaking changes before upgrading across major versions.
+
+### Upgrade steps
+
+1. **Update the version pin** in `Cargo.toml`:
+
+   ```toml
+   [workspace.dependencies]
+   soroban-sdk = "=<NEW_VERSION>"
+   soroban-sdk-testutils = { version = "=<NEW_VERSION>", package = "soroban-sdk", features = ["testutils"] }
+   ```
+
+2. **Regenerate the lockfile**:
+
+   ```bash
+   cargo update -p soroban-sdk
+   ```
+
+3. **Check for breaking changes** — compile the workspace first:
+
+   ```bash
+   cargo check --workspace --all-targets
+   ```
+
+   Common breaking-change patterns to watch for:
+   - Renamed or removed items in `soroban_sdk::{Address, Env, Symbol, …}`
+   - Changed `#[contracttype]` / `#[contractimpl]` macro signatures
+   - New required trait impls for `Val` / `TryFromVal`
+   - Altered `token::Client` method signatures
+
+4. **Run the full test suite**, including feature-flagged variants:
+
+   ```bash
+   cargo test --workspace
+   cargo test -p soroban-escrow-template --features pausable,upgradeable
+   cargo test -p soroban-token-template --features pausable,capped-supply
+   ```
+
+5. **Run benchmarks** to catch performance regressions:
+
+   ```bash
+   cargo criterion --package contract-benchmarks
+   ```
+
+6. **Update docs** — edit `docs/gas-costs.md` to reflect the new protocol
+   version and re-verify fee schedule values.
+
+7. **Update this file** — change the version reference in the Prerequisites
+   table and this section to match the new pinned version.
+
+8. Open a PR with **only** the SDK bump and its fixes — do not mix unrelated
+   changes so reviewers can easily evaluate the upgrade diff.
+
 # Contributing to Soroban Starter Kit
 
 Thanks for taking the time to contribute. This guide covers everything you need to get set up, write good code, and get your changes merged.
