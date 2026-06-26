@@ -318,6 +318,8 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 ## 📚 Resources
 
 - [System Architecture](docs/architecture.md) — High-level design, contract relationships, storage tiers, event model, and admin framework
+- [Contract API Reference](docs/contract-api.md) — Full public API for all contracts (parameters, return types, errors)
+- [Upgrade Guide](docs/upgrade-guide.md) — Step-by-step on-chain WASM upgrade with timelock and key rotation
 - [Security Best Practices](docs/security.md)
 - [Integration Guide](docs/integration-guide.md)
 - [Deployment Guide](docs/deployment-guide.md)
