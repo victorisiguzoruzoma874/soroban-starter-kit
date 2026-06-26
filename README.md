@@ -48,6 +48,8 @@ just --list
 | **NFT** | Non-fungible token with admin minting and optional supply cap | Digital collectibles, on-chain ownership, access tokens | ✅ Complete |
 | **DAO** | On-chain governance with token-weighted voting | Protocol upgrades, treasury management, community decisions | ✅ Complete |
 | **Swap** | Atomic two-party token swap with deadline | P2P token exchange, OTC trades, trustless DeFi swaps | ✅ Complete |
+| **Oracle** | Price oracle consumer with staleness validation | DeFi price feeds, on-chain data consumption, freshness checks | ✅ Complete |
+| **Lottery** | Verifiable on-chain lottery with commit-reveal randomness | Raffles, fair draws, decentralised prize distribution | ✅ Complete |
 
 ### Token Contract Features
 - **Standard Interface**: Full Soroban token compatibility
@@ -133,6 +135,22 @@ just --list
 - **Token Agnostic**: Works with any pair of Soroban-compatible tokens
 - **Event Emission**: `swap_proposed`, `swap_accepted`, and `swap_cancelled` events
 
+### Oracle Contract Features
+- **Price Feed Consumer**: Admin pushes price updates; consumers read via `get_price`
+- **Staleness Validation**: `get_price` rejects prices older than the configured ledger threshold
+- **Admin-Controlled Updates**: Only the admin may push new prices
+- **Configurable Threshold**: Staleness threshold set at initialization
+- **Event Emission**: `initialized` and `price_updated` events
+- **TTL Management**: Instance storage TTL is extended on every interaction
+
+### Lottery Contract Features
+- **Commit-Reveal Randomness**: Admin commits `hash(secret ++ salt)` before the draw, then reveals to prove fairness
+- **Ticket Purchase**: Any address buys tickets before the admin commits
+- **Verifiable Winner Selection**: Winner index derived from SHA-256 of revealed secret, salt, and ledger sequence
+- **Prize Pool Distribution**: Full ticket pool transferred to winner atomically
+- **State Machine**: Open → Committed → Drawn — each transition is irreversible
+- **Event Emission**: `initialized`, `ticket_purchased`, `committed`, and `winner_drawn` events
+
 Each template includes:
 - ✅ Complete contract implementation
 - ✅ Comprehensive unit tests (8+ test cases each)
@@ -146,6 +164,28 @@ Each template includes:
 - [Docker](https://www.docker.com/) (for local Stellar node)
 
 > **Zero-install option:** Open this repo in a pre-configured environment with all tools ready — see the [Dev Container & Codespaces Guide](docs/devcontainer.md).
+
+## 🔄 Compatibility Matrix
+
+This repository is pinned to `soroban-sdk = "=21.7.7"`. Each major SDK version is tightly coupled to a Stellar network protocol version. Use the table below to pick the right SDK for your target network.
+
+> ⚠️ **Always verify compatibility before deploying to Mainnet.** Contracts compiled against SDK v21 will not work on a node running Protocol 22 or later without recompilation against the matching SDK version.
+
+| soroban-sdk version | Stellar Protocol | Network status | Notes |
+|---------------------|-----------------|----------------|-------|
+| `21.x` (this repo: `21.7.7`) | Protocol 21 | Mainnet (Jun 2024) | secp256r1, separate TTL extension for instance/code |
+| `22.x` | Protocol 22 | Mainnet (Dec 2024) | Constructor support, BLS12-381 host functions |
+| `23.x` | Protocol 23 "Whisk" | Mainnet (Sep 2025) | Unified events (CAP-67), state archival (CAP-62/66) |
+| `25.x` | Protocol 25 "X-Ray" | Mainnet (Jan 2026) | BN254 elliptic curve ops, Poseidon hash functions |
+| `26.x` | Protocol 26 "Yardstick" | Mainnet (May 2026) | Freeze ledger entries, muxed address conversions, ZK BN254 |
+
+**To upgrade this repository to a newer SDK:**
+1. Update `soroban-sdk = "=<new-version>"` in `Cargo.toml`.
+2. Update `stellar-cli` to the matching version (`cargo install stellar-cli --version <new-version>`).
+3. Rebuild all contracts and run the full test suite.
+4. Update this matrix and `docs/gas-costs.md` with the new protocol version and fee schedule.
+
+For the authoritative version table, see [Stellar Software Versions](https://developers.stellar.org/docs/networks/software-versions).
 
 ## 📖 Usage
 

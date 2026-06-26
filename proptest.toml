@@ -1,0 +1,13 @@
+# proptest configuration
+# See https://proptest-rs.github.io/proptest/proptest/config.html
+
+[proptest]
+# Number of test cases to generate per property test (default: 256).
+# Override per-run with PROPTEST_CASES=<n> environment variable.
+cases = 256
+
+# Write failing seeds to a regression file so failures are reproducible.
+# The file is written to proptest-regressions/<module_path>.txt next to the
+# test source file.  These files are listed in .gitignore; see docs/testing-guide.md
+# for instructions on how to replay a failing seed.
+failure_persistence = "MapPath"

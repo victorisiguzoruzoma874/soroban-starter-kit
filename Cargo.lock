@@ -1280,6 +1280,7 @@ checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
 name = "soroban-auction-template"
+name = "soroban-airdrop-template"
 version = "0.1.0"
 dependencies = [
  "soroban-common",
@@ -1431,6 +1432,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "soroban-marketplace-template"
+name = "soroban-lottery-template"
+version = "0.1.0"
+dependencies = [
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "soroban-multisig-template"
 version = "0.1.0"
 dependencies = [
@@ -1444,6 +1454,14 @@ name = "soroban-nft-template"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "soroban-oracle-template"
+version = "0.1.0"
+dependencies = [
  "soroban-common",
  "soroban-sdk",
 ]
@@ -1523,6 +1541,14 @@ name = "soroban-staking-template"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "soroban-common",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "soroban-subscription-template"
+version = "0.1.0"
+dependencies = [
  "soroban-common",
  "soroban-sdk",
 ]

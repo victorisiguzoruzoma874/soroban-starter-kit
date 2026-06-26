@@ -15,6 +15,9 @@ members = [
   "tests",
   "fuzz",
 ]
+members = ["contracts/common", "contracts/token", "contracts/escrow", "contracts/vesting", "contracts/staking", "contracts/multisig", "contracts/subscription", "contracts/timelock", "contracts/nft", "contracts/dao", "contracts/swap", "contracts/marketplace", "contracts/airdrop", "tests", "fuzz"]
+members = ["contracts/common", "contracts/token", "contracts/escrow", "contracts/vesting", "contracts/staking", "contracts/multisig", "contracts/subscription", "contracts/timelock", "contracts/nft", "contracts/dao", "contracts/swap", "tests", "fuzz"]
+members = ["contracts/common", "contracts/token", "contracts/escrow", "contracts/vesting", "contracts/staking", "contracts/multisig", "contracts/subscription", "contracts/timelock", "contracts/nft", "contracts/dao", "contracts/swap", "contracts/oracle", "contracts/lottery", "tests", "fuzz"]
 resolver = "2"
 
 [workspace.dependencies]
