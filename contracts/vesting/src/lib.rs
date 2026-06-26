@@ -8,6 +8,8 @@ mod storage;
 
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod prop_test;
 
 pub use errors::VestingError;
 pub use storage::{DataKey, VestingInfo};
@@ -19,7 +21,7 @@ fn bump(env: &Env) {
 }
 
 /// Returns the number of tokens vested as of `ledger`, ignoring already-claimed tokens.
-fn vested_amount(amount: i128, cliff_ledger: u32, end_ledger: u32, ledger: u32) -> i128 {
+pub(crate) fn vested_amount(amount: i128, cliff_ledger: u32, end_ledger: u32, ledger: u32) -> i128 {
     if ledger < cliff_ledger {
         return 0;
     }

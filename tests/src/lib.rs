@@ -1,2 +1,4 @@
 // Placeholder so the crate compiles as a library.
-// All integration tests live in tests/tests/integration.rs.
+// Integration test binaries live in tests/tests/; lifecycle coverage in src/.
+#[cfg(test)]
+mod escrow_lifecycle;

@@ -56,3 +56,44 @@ impl core::fmt::Display for EscrowError {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    extern crate std;
+
+    use super::EscrowError;
+    use std::format;
+    use std::string::String;
+
+    fn render_error_code_snapshot() -> String {
+        format!(
+            "\
+EscrowError::NotAuthorized = {}\n\
+EscrowError::InvalidState = {}\n\
+EscrowError::DeadlinePassed = {}\n\
+EscrowError::DeadlineNotReached = {}\n\
+EscrowError::AlreadyInitialized = {}\n\
+EscrowError::NotInitialized = {}\n\
+EscrowError::InsufficientFunds = {}\n\
+EscrowError::InvalidAmount = {}\n\
+EscrowError::InvalidParties = {}\n",
+            EscrowError::NotAuthorized as u32,
+            EscrowError::InvalidState as u32,
+            EscrowError::DeadlinePassed as u32,
+            EscrowError::DeadlineNotReached as u32,
+            EscrowError::AlreadyInitialized as u32,
+            EscrowError::NotInitialized as u32,
+            EscrowError::InsufficientFunds as u32,
+            EscrowError::InvalidAmount as u32,
+            EscrowError::InvalidParties as u32,
+        )
+    }
+
+    #[test]
+    fn escrow_error_codes_match_snapshot() {
+        assert_eq!(
+            render_error_code_snapshot(),
+            include_str!("../snapshots/error_codes.snap")
+        );
+    }
+}

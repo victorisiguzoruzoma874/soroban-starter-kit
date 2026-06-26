@@ -167,6 +167,17 @@ Each template includes:
 
 > **Zero-install option:** Open this repo in a pre-configured environment with all tools ready — see the [Dev Container & Codespaces Guide](docs/devcontainer.md).
 
+### VS Code Setup
+
+A [.vscode/extensions.json](.vscode/extensions.json) file is included with recommended extensions for a consistent developer experience. VS Code will prompt you to install them when you open the project, or you can install them manually:
+
+| Extension | Purpose |
+|-----------|---------|
+| `rust-lang.rust-analyzer` | Rust language server (completions, go-to-def, inline errors) |
+| `tamasfe.even-better-toml` | Syntax highlighting and validation for `Cargo.toml` |
+| `serayuzgur.crates` | Inline crate version hints and outdated-dependency warnings |
+| `usernamehw.errorlens` | Inline diagnostic messages directly in the editor |
+
 ## 🔄 Compatibility Matrix
 
 This repository is pinned to `soroban-sdk = "=21.7.7"`. Each major SDK version is tightly coupled to a Stellar network protocol version. Use the table below to pick the right SDK for your target network.
@@ -219,6 +230,29 @@ Start a local Stellar node with Soroban RPC:
 ```bash
 docker compose up stellar-node
 ```
+
+### Creating a New Contract
+
+Scaffold a fresh contract from the `contracts/common` skeleton with a single command:
+
+```bash
+./scripts/new-contract.sh <contract-name>
+```
+
+**Example** — create a `price-feed` contract:
+
+```bash
+./scripts/new-contract.sh price-feed
+```
+
+This creates `contracts/price-feed/` (with `Cargo.toml` and `src/lib.rs`) and registers it in the workspace. Verify it compiles and its test passes immediately:
+
+```bash
+cargo check -p soroban-price-feed
+cargo test  -p soroban-price-feed
+```
+
+Then replace the stub `hello()` method in `contracts/price-feed/src/lib.rs` with your contract logic.
 
 ## ⚠️ Error Reference
 

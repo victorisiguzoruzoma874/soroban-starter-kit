@@ -583,6 +583,47 @@ mod capped_supply_tests {
         client.mint(&user, &large);
         assert_eq!(client.total_supply(), large);
     }
+
+    #[test]
+    fn test_batch_mint_exactly_at_cap_succeeds() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user1 = Address::generate(&env);
+        let user2 = Address::generate(&env);
+        let cap = 1_000i128;
+        let client = init_capped(&env, &admin, cap);
+
+        let recipients = soroban_sdk::vec![
+            &env,
+            (user1.clone(), 400i128),
+            (user2.clone(), 600i128),
+        ];
+        client.batch_mint(&recipients);
+
+        assert_eq!(client.balance(&user1), 400i128);
+        assert_eq!(client.balance(&user2), 600i128);
+        assert_eq!(client.total_supply(), cap);
+    }
+
+    #[test]
+    fn test_batch_mint_exceeds_cap_fails() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let admin = Address::generate(&env);
+        let user1 = Address::generate(&env);
+        let user2 = Address::generate(&env);
+        let cap = 1_000i128;
+        let client = init_capped(&env, &admin, cap);
+
+        let recipients = soroban_sdk::vec![
+            &env,
+            (user1.clone(), 600i128),
+            (user2.clone(), 500i128),
+        ];
+        assert!(client.try_batch_mint(&recipients).is_err());
+        assert_eq!(client.total_supply(), 0);
+    }
 }
 
 #[test]

@@ -19,6 +19,25 @@ The contract supports multi-sig arbiters. In this scenario, a dispute can only b
 ### State Machine Bypass
 
 The contract's state machine is designed to prevent invalid state transitions. For example, a refund can only be requested when the contract is in the `Funded` or `Delivered` state. The state machine is enforced by the `require_state` function, which is called by all state-changing functions. There are no known ways to bypass the state machine.
+
+## Re-Entrancy Analysis
+
+Soroban contract execution is protected from EVM-style re-entrancy by the host execution model. A contract invocation runs in a single call stack managed by the Soroban host, and authorization is captured for the invocation tree rather than allowing an external contract to asynchronously re-enter the same in-flight frame. The relevant host behavior is documented in the Soroban host repository and Stellar developer docs for contract invocation, host functions, and authorization.
+
+The escrow contract still follows a conservative checks-effects-interactions shape for clarity. Lifecycle methods validate authorization and state first, write the new escrow state before or alongside token movement, and rely on explicit state transitions such as `Created`, `Funded`, `Delivered`, `Completed`, `Refunded`, `Cancelled`, and `Disputed` to reject repeated settlement paths.
+
+Escrow invariants that depend on this model:
+
+- Funds can only move out through a state-specific path after the current state has been checked.
+- Terminal states prevent a second release, refund, or cancellation from being accepted.
+- Partial release reduces the stored escrow amount before the remaining balance can be released later.
+- Dispute resolution requires the configured arbiter policy and then transitions back to a state that preserves the normal release/refund checks.
+
+References:
+
+- Soroban host repository: https://github.com/stellar/rs-soroban-env
+- Stellar Soroban authorization docs: https://developers.stellar.org/docs/build/smart-contracts/authorization
+- Stellar Soroban contract invocation docs: https://developers.stellar.org/docs/build/smart-contracts/example-contracts/cross-contract-calls
 ## Authorization
 
 | Contract | Function | Authorization |

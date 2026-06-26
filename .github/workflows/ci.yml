@@ -202,56 +202,30 @@ jobs:
           path: lcov.info
           retention-days: 30
 
-  mutation-testing:
-    name: Mutation Testing
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [token_fuzz, escrow_initialize, token_mint_burn]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install nightly Rust
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
         with:
-          toolchain: stable
+          toolchain: nightly
 
       - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
 
-      - name: Install cargo-mutants
-        run: cargo install cargo-mutants --locked
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
 
-      - name: Run mutation tests on token and escrow
-        run: |
-          cargo mutants --config mutants.toml --baseline skip --no-times --no-shuffle \
-            -p soroban-token-template -p soroban-escrow-template \
-            -o mutants.out
-          if [ -f mutants.out/outcomes.json ]; then
-            OUTCOMES=mutants.out/outcomes.json
-          elif [ -f mutants.out/mutants.out/outcomes.json ]; then
-            OUTCOMES=mutants.out/mutants.out/outcomes.json
-          elif [ -f mutants.out/outcomes.jsonl ]; then
-            OUTCOMES=mutants.out/outcomes.jsonl
-          else
-            OUTCOMES=mutants.out/mutants.out/outcomes.jsonl
-          fi
-          if [[ "$OUTCOMES" == *.jsonl ]]; then
-            SURVIVORS=$(grep -c '"status": "missed"' "$OUTCOMES" 2>/dev/null || echo 0)
-          else
-            SURVIVORS=$(jq '[.outcomes[]? // .[]? | select(.status == "missed")] | length' "$OUTCOMES")
-          fi
-          echo "Surviving mutants: ${SURVIVORS}"
-          if [ "$SURVIVORS" -gt 0 ]; then
-            echo "ERROR: ${SURVIVORS} surviving mutant(s) in critical paths"
-            cat mutants.out/outcomes.jsonl 2>/dev/null | jq 'select(.status == "missed")' || true
-            exit 1
-          fi
-
-      - name: Upload mutation report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mutation-report
-          path: mutants.out/
-          retention-days: 30
+      - name: Run fuzz target (10 000 iterations)
+        working-directory: fuzz
+        run: cargo +nightly fuzz run ${{ matrix.target }} -- -runs=10000 -max_total_time=120
 
   deny:
     name: License and Duplicate Check

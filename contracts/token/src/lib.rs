@@ -20,7 +20,7 @@ mod prop_test;
 mod test;
 
 use admin::require_admin;
-use allowance::get_allowance;
+use allowance::{allowance_is_active, get_allowance};
 use errors::TokenError;
 use soroban_common::{extend_ttl_instance, extend_ttl_persistent, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 use storage::{AllowanceDataKey, AllowanceValue, DataKey, MetadataKey};
@@ -313,7 +313,9 @@ impl TokenContract {
         let key = DataKey::Allowance(AllowanceDataKey { from, spender });
         let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
         match val {
-            Some(v) if env.ledger().sequence() <= v.expiration_ledger => Some(v.expiration_ledger),
+            Some(v) if allowance_is_active(env.ledger().sequence(), v.expiration_ledger) => {
+                Some(v.expiration_ledger)
+            }
             _ => None,
         }
     }
@@ -375,6 +377,8 @@ impl TokenContract {
 #[cfg(feature = "upgradeable")]
 #[contractimpl]
 impl TokenContract {
+    /// Delay before an upgrade can execute: 17,280 ledgers, approximately
+    /// 24 hours at the expected 5-second Soroban ledger cadence.
     const UPGRADE_DELAY_LEDGERS: u32 = 17_280;
 
     pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {

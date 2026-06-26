@@ -4,10 +4,25 @@
 //! and `burn_from` share a single code path, eliminating the duplication that
 //! previously existed across `token_interface.rs`.
 
-use soroban_sdk::{Env, panic_with_error};
+use soroban_sdk::{panic_with_error, Env};
 
 use crate::errors::TokenError;
 use crate::storage::{AllowanceDataKey, AllowanceValue, DataKey};
+
+/// Soroban ledgers are expected roughly every 5 seconds on public networks.
+/// Allowance expiration is ledger-exact, so no additional wall-clock grace is
+/// applied beyond the caller-provided `expiration_ledger` (~0 seconds).
+const ALLOWANCE_EXPIRY_GRACE_LEDGERS: u32 = 0;
+
+/// Sentinel for an allowance that is already expired or absent.
+///
+/// Ledger 0 is genesis-time and therefore represents no future duration
+/// (~0 seconds) for active approvals.
+const EXPIRED_ALLOWANCE_LEDGER: u32 = 0;
+
+pub(crate) fn allowance_is_active(current_ledger: u32, expiration_ledger: u32) -> bool {
+    current_ledger <= expiration_ledger.saturating_add(ALLOWANCE_EXPIRY_GRACE_LEDGERS)
+}
 
 /// Returns the active allowance (amount) for `(from, spender)`, or `0` if the
 /// allowance is absent or expired.
@@ -15,7 +30,7 @@ pub fn get_allowance(env: &Env, from: soroban_sdk::Address, spender: soroban_sdk
     let key = DataKey::Allowance(AllowanceDataKey { from, spender });
     let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
     match val {
-        Some(v) if env.ledger().sequence() <= v.expiration_ledger => v.amount,
+        Some(v) if allowance_is_active(env.ledger().sequence(), v.expiration_ledger) => v.amount,
         _ => 0,
     }
 }
@@ -60,10 +75,10 @@ pub fn deduct_allowance(
     });
     let val: Option<AllowanceValue> = env.storage().temporary().get(&key);
     let (current, expiration_ledger) = match val {
-        Some(v) if env.ledger().sequence() <= v.expiration_ledger => {
+        Some(v) if allowance_is_active(env.ledger().sequence(), v.expiration_ledger) => {
             (v.amount, v.expiration_ledger)
         }
-        _ => (0, 0),
+        _ => (0, EXPIRED_ALLOWANCE_LEDGER),
     };
     if current < amount {
         panic_with_error!(env, TokenError::InsufficientAllowance);
