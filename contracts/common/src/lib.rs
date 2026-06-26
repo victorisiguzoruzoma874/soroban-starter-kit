@@ -165,3 +165,29 @@ pub const LEDGER_LIFETIME_THRESHOLD: u32 = 120_960;
 
 /// Target TTL (in ledgers) after each extension (~60 days at 5 seconds per ledger).
 pub const LEDGER_BUMP_AMOUNT: u32 = 518_400;
+
+/// Validates that a deadline is sufficiently far in the future.
+///
+/// Returns `Ok(())` if `deadline >= current_ledger + MIN_DEADLINE_BUFFER`.
+/// Returns an error otherwise.
+///
+/// # Examples
+///
+/// ```ignore
+/// use soroban_common::validate_deadline;
+/// use soroban_sdk::Env;
+///
+/// let env = Env::default();
+/// let deadline = env.ledger().sequence() + 10;
+/// validate_deadline(&env, deadline)?; // Ok if MIN_DEADLINE_BUFFER <= 10
+/// ```
+pub fn validate_deadline<E>(env: &Env, deadline: u32) -> Result<(), E>
+where
+    E: From<()>,
+{
+    if deadline < env.ledger().sequence() + MIN_DEADLINE_BUFFER {
+        Err(E::from(()))
+    } else {
+        Ok(())
+    }
+}

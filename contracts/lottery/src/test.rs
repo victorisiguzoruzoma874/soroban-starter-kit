@@ -1,0 +1,198 @@
+#![cfg(test)]
+
+use super::*;
+use soroban_sdk::{
+    testutils::Address as _,
+    token::TokenInterface,
+    Address, Bytes, BytesN, Env, String,
+};
+
+// ---------------------------------------------------------------------------
+// MockToken
+// ---------------------------------------------------------------------------
+
+#[contract]
+pub struct MockToken;
+
+#[contractimpl]
+impl TokenInterface for MockToken {
+    fn allowance(_env: Env, _from: Address, _spender: Address) -> i128 { 0 }
+    fn approve(_env: Env, _from: Address, _spender: Address, _amount: i128, _exp: u32) {}
+    fn balance(_env: Env, _id: Address) -> i128 { i128::MAX }
+    fn transfer(_env: Env, _from: Address, _to: Address, _amount: i128) {}
+    fn transfer_from(_env: Env, _spender: Address, _from: Address, _to: Address, _amount: i128) {}
+    fn burn(_env: Env, _from: Address, _amount: i128) {}
+    fn burn_from(_env: Env, _spender: Address, _from: Address, _amount: i128) {}
+    fn decimals(_env: Env) -> u32 { 7 }
+    fn name(env: Env) -> String { String::from_str(&env, "Mock") }
+    fn symbol(env: Env) -> String { String::from_str(&env, "MCK") }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+fn make_commit(env: &Env, secret: &[u8; 32], salt: &[u8; 32]) -> BytesN<32> {
+    let mut preimage = Bytes::new(env);
+    preimage.extend_from_array(secret);
+    preimage.extend_from_array(salt);
+    env.crypto().sha256(&preimage).into()
+}
+
+fn setup(env: &Env) -> (LotteryContractClient, Address, Address) {
+    let admin = Address::generate(env);
+    let token = env.register_contract(None, MockToken);
+    let addr = env.register_contract(None, LotteryContract);
+    let client = LotteryContractClient::new(env, &addr);
+    client.initialize(&admin, &token, &100);
+    (client, admin, token)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_initialize() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, token) = setup(&env);
+    let info = client.get_info();
+    assert_eq!(info.admin, admin);
+    assert_eq!(info.token, token);
+    assert_eq!(info.ticket_price, 100);
+    assert_eq!(info.state, LotteryState::Open);
+    assert!(info.participants.is_empty());
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #1)")]
+fn test_initialize_twice_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, admin, token) = setup(&env);
+    client.initialize(&admin, &token, &100);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")]
+fn test_initialize_zero_price_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let admin = Address::generate(&env);
+    let token = env.register_contract(None, MockToken);
+    let addr = env.register_contract(None, LotteryContract);
+    let client = LotteryContractClient::new(&env, &addr);
+    client.initialize(&admin, &token, &0);
+}
+
+#[test]
+fn test_buy_ticket() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup(&env);
+    let buyer = Address::generate(&env);
+    client.buy_ticket(&buyer);
+    assert_eq!(client.get_info().participants.len(), 1);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #10)")]
+fn test_commit_with_no_tickets_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup(&env);
+    let secret = [1u8; 32];
+    let salt = [2u8; 32];
+    let hash = make_commit(&env, &secret, &salt);
+    client.commit(&hash);
+}
+
+#[test]
+fn test_full_lifecycle() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup(&env);
+
+    let buyer1 = Address::generate(&env);
+    let buyer2 = Address::generate(&env);
+    client.buy_ticket(&buyer1);
+    client.buy_ticket(&buyer2);
+
+    let secret = [42u8; 32];
+    let salt = [99u8; 32];
+    let hash = make_commit(&env, &secret, &salt);
+    client.commit(&hash);
+    assert_eq!(client.get_info().state, LotteryState::Committed);
+
+    let secret_bytes: BytesN<32> = BytesN::from_array(&env, &secret);
+    let salt_bytes: BytesN<32> = BytesN::from_array(&env, &salt);
+    let winner = client.draw(&secret_bytes, &salt_bytes);
+
+    assert!(winner == buyer1 || winner == buyer2);
+    assert_eq!(client.get_info().state, LotteryState::Drawn);
+    assert_eq!(client.get_winner(), winner);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #9)")]
+fn test_draw_wrong_preimage_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup(&env);
+
+    let buyer = Address::generate(&env);
+    client.buy_ticket(&buyer);
+
+    let secret = [1u8; 32];
+    let salt = [2u8; 32];
+    let hash = make_commit(&env, &secret, &salt);
+    client.commit(&hash);
+
+    // Reveal wrong secret.
+    let bad_secret: BytesN<32> = BytesN::from_array(&env, &[9u8; 32]);
+    let salt_bytes: BytesN<32> = BytesN::from_array(&env, &salt);
+    client.draw(&bad_secret, &salt_bytes);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #4)")]
+fn test_buy_ticket_after_commit_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup(&env);
+
+    let buyer = Address::generate(&env);
+    client.buy_ticket(&buyer);
+
+    let secret = [1u8; 32];
+    let salt = [2u8; 32];
+    let hash = make_commit(&env, &secret, &salt);
+    client.commit(&hash);
+
+    // Should fail — lottery is no longer Open.
+    let another = Address::generate(&env);
+    client.buy_ticket(&another);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5)")]
+fn test_draw_after_draw_fails() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let (client, _, _) = setup(&env);
+
+    let buyer = Address::generate(&env);
+    client.buy_ticket(&buyer);
+
+    let secret = [1u8; 32];
+    let salt = [2u8; 32];
+    let hash = make_commit(&env, &secret, &salt);
+    client.commit(&hash);
+
+    let secret_bytes: BytesN<32> = BytesN::from_array(&env, &secret);
+    let salt_bytes: BytesN<32> = BytesN::from_array(&env, &salt);
+    client.draw(&secret_bytes, &salt_bytes);
+    // Second draw should fail.
+    client.draw(&secret_bytes, &salt_bytes);
+}

@@ -22,12 +22,14 @@ use soroban_common::{LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 #[contract]
 pub struct MultisigContract;
 
+#[inline]
 fn bump_instance(env: &Env) {
     env.storage()
         .instance()
         .extend_ttl(LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
 }
 
+#[inline]
 fn bump_transaction(env: &Env, tx_id: u64) {
     env.storage().persistent().extend_ttl(
         &DataKey::Transaction(tx_id),
@@ -36,6 +38,7 @@ fn bump_transaction(env: &Env, tx_id: u64) {
     );
 }
 
+#[inline]
 fn contains(list: &Vec<Address>, address: &Address) -> bool {
     for item in list.iter() {
         if item == *address {
@@ -45,6 +48,7 @@ fn contains(list: &Vec<Address>, address: &Address) -> bool {
     false
 }
 
+#[inline]
 fn validate_unique_signers(signers: &Vec<Address>) -> Result<(), MultisigError> {
     if signers.is_empty() {
         return Err(MultisigError::InvalidSigners);
@@ -60,6 +64,7 @@ fn validate_unique_signers(signers: &Vec<Address>) -> Result<(), MultisigError> 
     Ok(())
 }
 
+#[inline]
 fn validate_threshold(threshold: u32, signer_count: u32) -> Result<(), MultisigError> {
     if threshold == 0 || threshold > signer_count {
         return Err(MultisigError::InvalidThreshold);
@@ -285,6 +290,7 @@ impl MultisigContract {
         Self::get_transaction(env, tx_id).map(|tx| tx.signatures.len())
     }
 
+    #[inline]
     fn get_required_signers(env: &Env) -> Result<Vec<Address>, MultisigError> {
         env.storage()
             .instance()
@@ -292,6 +298,7 @@ impl MultisigContract {
             .ok_or(MultisigError::NotInitialized)
     }
 
+    #[inline]
     fn get_required_transaction(env: &Env, tx_id: u64) -> Result<Transaction, MultisigError> {
         env.storage()
             .persistent()
@@ -299,6 +306,7 @@ impl MultisigContract {
             .ok_or(MultisigError::TransactionNotFound)
     }
 
+    #[inline]
     fn require_signer(env: &Env, signer: &Address) -> Result<(), MultisigError> {
         let signers = Self::get_required_signers(env)?;
         if !contains(&signers, signer) {
@@ -307,6 +315,7 @@ impl MultisigContract {
         Ok(())
     }
 
+    #[inline]
     fn require_threshold_approvals(
         env: &Env,
         approvals: &Vec<Address>,

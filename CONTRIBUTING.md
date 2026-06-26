@@ -51,6 +51,20 @@ cargo install cargo-udeps --locked
 cargo +nightly udeps --workspace --all-targets
 ```
 
+### cargo-semver-checks (breaking API changes)
+
+The `semver` CI job runs `cargo semver-checks` on every PR to detect breaking public API changes in `soroban-token-template` and `soroban-escrow-template`.
+
+**Semver policy:** This repository follows [Semantic Versioning](https://semver.org/). Any change that removes, renames, or changes the signature of a public contract entry point, error type, or event is a **breaking change** and requires a major version bump. Adding new public items is backwards-compatible and requires only a minor bump. Bug fixes with no API change require a patch bump.
+
+Install locally:
+
+```bash
+cargo install cargo-semver-checks --locked
+cargo semver-checks -p soroban-token-template
+cargo semver-checks -p soroban-escrow-template
+```
+
 ---
 
 ## Code style
@@ -305,6 +319,12 @@ Before opening a pull request, confirm all of the following:
 - [ ] `README.md` is updated if the change affects usage or the template list
 - [ ] The PR title is concise (≤ 70 characters) and follows the format `type: short description` (e.g. `feat: add vesting contract template`)
 - [ ] The PR description references the issue it closes (`Closes #NNN`)
+
+### Conventional Commits
+
+All pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification. A CI check will enforce this.
+
+The format is `type(scope): subject`, where `type` is one of: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`. The `scope` is optional.
 
 ---
 

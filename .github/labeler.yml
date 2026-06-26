@@ -1,0 +1,14 @@
+"contract: common":
+  - contracts/common/**/*
+"contract: dao":
+  - contracts/dao/**/*
+"contract: escrow":
+  - contracts/escrow/**/*
+"contract: multisig":
+  - contracts/multisig/**/*
+"contract: nft":
+  - contracts/nft/**/*
+"contract: staking":
+  - contracts/staking/**/*
+"contract: token":
+  - contracts/token/**/*

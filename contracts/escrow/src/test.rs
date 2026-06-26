@@ -286,14 +286,14 @@ fn test_fund() {
 
     assert_eq!(client.get_state(), Some(EscrowState::Funded));
 
-    // Verify escrow_funded event was emitted
+    // Verify funded event was emitted
     assert_eq!(
         env.events().all(),
         soroban_sdk::vec![
             &env,
             (
                 contract_address.clone(),
-                (Symbol::new(&env, "escrow_created"), buyer.clone(), seller.clone()).into_val(&env),
+                (Symbol::new(&env, "created"), buyer.clone(), seller.clone()).into_val(&env),
                 amount.into_val(&env),
             ),
             (
@@ -303,7 +303,7 @@ fn test_fund() {
             ),
             (
                 contract_address.clone(),
-                (Symbol::new(&env, "escrow_funded"), buyer.clone()).into_val(&env),
+                (Symbol::new(&env, "funded"), buyer.clone()).into_val(&env),
                 amount.into_val(&env),
             ),
         ]
