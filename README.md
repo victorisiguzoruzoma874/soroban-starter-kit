@@ -5,6 +5,8 @@
 
 A curated collection of production-ready Soroban smart contract templates. These templates help developers quickly bootstrap common use cases on Soroban (Stellar's smart contract platform) for DeFi, payments, governance, and more.
 
+**También disponible en**: [Español 🇪🇸](README.es.md)
+
 ## 🚀 Quick Start
 
 ```bash
@@ -317,6 +319,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 
 ## 📚 Resources
 
+- [FAQ](docs/faq.md) — Common developer questions: setup, testing, deployment, feature flags, token customization
 - [System Architecture](docs/architecture.md) — High-level design, contract relationships, storage tiers, event model, and admin framework
 - [Contract API Reference](docs/contract-api.md) — Full public API for all contracts (parameters, return types, errors)
 - [Upgrade Guide](docs/upgrade-guide.md) — Step-by-step on-chain WASM upgrade with timelock and key rotation
@@ -330,6 +333,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 - [Stellar Laboratory](https://laboratory.stellar.org/)
 - [Security Best Practices](docs/security.md)
 - [Token Interface Compliance ADR](docs/adr/0007-token-interface-compliance.md)
+- [Batch Mint Design ADR](docs/adr/0009-batch-mint-design.md)
 - [Architecture Decision Records](docs/adr/README.md)
 
 ## 📄 License
