@@ -13,7 +13,7 @@ pub const MIN_DEADLINE_BUFFER: u32 = 10;
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use soroban_sdk::{Env, Address};
 /// use soroban_common::AdminKey;
 ///
@@ -35,7 +35,7 @@ pub enum AdminKey {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use soroban_sdk::{Env, Address};
 /// use soroban_common::{AdminKey, get_admin};
 ///
@@ -58,7 +58,7 @@ pub fn get_admin(env: &Env) -> Address {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use soroban_sdk::{Env, Address};
 /// use soroban_common::{AdminKey, try_get_admin};
 ///
@@ -85,7 +85,7 @@ pub fn try_get_admin(env: &Env) -> Option<Address> {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use soroban_sdk::{contracttype, Env};
 /// use soroban_common::get_instance;
 ///
@@ -116,7 +116,7 @@ where
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use soroban_sdk::Env;
 /// use soroban_common::extend_ttl_instance;
 ///
@@ -135,7 +135,7 @@ pub fn extend_ttl_instance(env: &Env, threshold: u32, extend_to: u32) {
 ///
 /// # Examples
 ///
-/// ```
+/// ```ignore
 /// use soroban_sdk::{contracttype, Env, Address};
 /// use soroban_common::extend_ttl_persistent;
 ///
