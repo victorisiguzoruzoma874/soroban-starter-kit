@@ -353,6 +353,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup, 
 
 ## 📚 Resources
 
+- [Directory Tree](docs/directory-tree.md) — Purpose of every directory in the repository
 - [FAQ](docs/faq.md) — Common developer questions: setup, testing, deployment, feature flags, token customization
 - [System Architecture](docs/architecture.md) — High-level design, contract relationships, storage tiers, event model, and admin framework
 - [Contract API Reference](docs/contract-api.md) — Full public API for all contracts (parameters, return types, errors)
