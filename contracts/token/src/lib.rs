@@ -1,5 +1,4 @@
 #![no_std]
-#![no_std]
 
 use soroban_sdk::{
     contract, contractimpl, token, token::TokenInterface, Address, Env, String,
@@ -349,10 +348,7 @@ impl TokenContract {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Frozen(account.clone()), &true);
         extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-        env.events().publish(
-            (soroban_sdk::Symbol::new(&env, "account_frozen"), account),
-            (),
-        );
+        events::account_frozen(&env, &account);
         Ok(())
     }
 
@@ -361,10 +357,7 @@ impl TokenContract {
         admin.require_auth();
         env.storage().instance().set(&DataKey::Frozen(account.clone()), &false);
         extend_ttl_instance(&env, LEDGER_LIFETIME_THRESHOLD, LEDGER_BUMP_AMOUNT);
-        env.events().publish(
-            (soroban_sdk::Symbol::new(&env, "account_unfrozen"), account),
-            (),
-        );
+        events::account_unfrozen(&env, &account);
         Ok(())
     }
 }
@@ -374,7 +367,7 @@ impl TokenContract {
 #[contractimpl]
 impl TokenContract {
     /// Delay before an upgrade can execute: 17,280 ledgers, approximately
-    /// 24 hours at the expected 5-second Soroban ledger cadence.
+    /// 24 hours at `soroban_common::LEDGER_SECONDS` seconds per ledger.
     const UPGRADE_DELAY_LEDGERS: u32 = 17_280;
 
     pub fn propose_upgrade(env: Env, wasm_hash: soroban_sdk::BytesN<32>) -> Result<(), TokenError> {
