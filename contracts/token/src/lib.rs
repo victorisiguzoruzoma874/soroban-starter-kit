@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 use soroban_sdk::{
     contract, contractimpl, token, token::TokenInterface, Address, Env, String,
 };
@@ -11,6 +14,8 @@ mod events;
 mod storage;
 mod token_interface;
 
+#[cfg(test)]
+mod prop_test;
 #[cfg(test)]
 mod test;
 

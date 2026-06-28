@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(test)]
+extern crate std;
+
 use soroban_sdk::{contract, contractimpl, token, Address, Env};
 use soroban_common::{extend_ttl_instance, LEDGER_BUMP_AMOUNT, LEDGER_LIFETIME_THRESHOLD};
 
@@ -198,4 +201,7 @@ impl EscrowContract {
     }
 }
 
+#[cfg(test)]
+mod prop_test;
+#[cfg(test)]
 mod test;
